@@ -177,7 +177,7 @@ lightning_logs/
 #data
 data/
 
-
+.agent/
 reports/
 
 *.mp4
