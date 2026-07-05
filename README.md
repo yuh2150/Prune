@@ -1,0 +1,1 @@
+python prune.py --weights yolov5s.pt --pruning-params "[(0, 0.25), (42, 0.5), (45, 0.5), (48, 0.25), (25, 0.25), (51, 0.5), (55, 0.25), (56, 0.25)]" --criterion 0 --name yolov5s-pruned.pt

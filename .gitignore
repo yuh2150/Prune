@@ -181,3 +181,5 @@ data/
 reports/
 
 *.mp4
+
+coco/*
