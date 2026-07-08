@@ -173,13 +173,11 @@ lightning_logs/
 # benchmark_results.csv
 # benchmark_results.xlsx
 
-
-#data
-data/
-
 .agent/
 reports/
 
 *.mp4
 
 coco/*
+
+datasets/coco128

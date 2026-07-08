@@ -9,6 +9,7 @@ from copy import copy
 from pathlib import Path
 
 import cv2
+import yaml
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -87,7 +88,11 @@ class Annotator:
         if self.pil or not is_ascii(label):
             self.draw.rectangle(box, width=self.lw, outline=color)  # box
             if label:
-                w, h = self.font.getsize(label)  # text width, height
+                try:
+                    left, top, right, bottom = self.font.getbbox(label)
+                    w, h = right - left, bottom - top
+                except AttributeError:
+                    w, h = self.font.getsize(label)
                 outside = box[1] - h >= 0  # label fits outside box
                 self.draw.rectangle([box[0],
                                      box[1] - h if outside else box[1],
@@ -113,7 +118,11 @@ class Annotator:
 
     def text(self, xy, text, txt_color=(255, 255, 255)):
         # Add text to image (PIL-only)
-        w, h = self.font.getsize(text)  # text width, height
+        try:
+            left, top, right, bottom = self.font.getbbox(text)
+            w, h = right - left, bottom - top
+        except AttributeError:
+            w, h = self.font.getsize(text)
         self.draw.text((xy[0], xy[1] - h + 1), text, fill=txt_color, font=self.font)
 
     def result(self):
@@ -427,30 +436,40 @@ def plot_evolve(evolve_csv='path/to/evolve.csv'):  # from utils.plots import *; 
     print(f'Saved {f}')
 
 
-def plot_results(file='path/to/results.csv', dir=''):
-    # Plot training results.csv. Usage: from utils.plots import *; plot_results('path/to/results.csv')
-    save_dir = Path(file).parent if file else Path(dir)
+def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
+    # Plot training 'results*.txt'. from utils.plots import *; plot_results(save_dir='runs/train/exp')
     fig, ax = plt.subplots(2, 5, figsize=(12, 6), tight_layout=True)
     ax = ax.ravel()
-    files = list(save_dir.glob('results*.csv'))
-    assert len(files), f'No results.csv files found in {save_dir.resolve()}, nothing to plot.'
+    s = ['Box', 'Objectness', 'Classification', 'Precision', 'Recall',
+         'val Box', 'val Objectness', 'val Classification', 'mAP@0.5', 'mAP@0.5:0.95']
+    if bucket:
+        # files = ['https://storage.googleapis.com/%s/results%g.txt' % (bucket, x) for x in id]
+        files = ['results%g.txt' % x for x in id]
+        c = ('gsutil cp ' + '%s ' * len(files) + '.') % tuple('gs://%s/results%g.txt' % (bucket, x) for x in id)
+        os.system(c)
+    else:
+        files = list(Path(save_dir).glob('results*.txt'))
+    assert len(files), 'No results.txt files found in %s, nothing to plot.' % os.path.abspath(save_dir)
     for fi, f in enumerate(files):
         try:
-            data = pd.read_csv(f)
-            s = [x.strip() for x in data.columns]
-            x = data.values[:, 0]
-            for i, j in enumerate([1, 2, 3, 4, 5, 8, 9, 10, 6, 7]):
-                y = data.values[:, j]
-                # y[y == 0] = np.nan  # don't show zero values
-                ax[i].plot(x, y, marker='.', label=f.stem, linewidth=2, markersize=8)
-                ax[i].set_title(s[j], fontsize=12)
-                # if j in [8, 9, 10]:  # share train and val loss y axes
+            results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
+            n = results.shape[1]  # number of rows
+            x = range(start, min(stop, n) if stop else n)
+            for i in range(10):
+                y = results[i, x]
+                if i in [0, 1, 2, 5, 6, 7]:
+                    y[y == 0] = np.nan  # don't show zero loss values
+                    # y /= y[0]  # normalize
+                label = labels[fi] if len(labels) else f.stem
+                ax[i].plot(x, y, marker='.', label=label, linewidth=2, markersize=8)
+                ax[i].set_title(s[i])
+                # if i in [5, 6, 7]:  # share train and val loss y axes
                 #     ax[i].get_shared_y_axes().join(ax[i], ax[i - 5])
         except Exception as e:
-            print(f'Warning: Plotting error for {f}: {e}')
+            print('Warning: Plotting error for %s; %s' % (f, e))
+
     ax[1].legend()
-    fig.savefig(save_dir / 'results.png', dpi=200)
-    plt.close()
+    fig.savefig(Path(save_dir) / 'results.png', dpi=200)
 
 
 def profile_idetection(start=0, stop=0, labels=(), save_dir=''):
@@ -483,6 +502,28 @@ def profile_idetection(start=0, stop=0, labels=(), save_dir=''):
     ax[1].legend()
     plt.savefig(Path(save_dir) / 'idetection_profile.png', dpi=200)
 
+def plot_evolution(yaml_file='data/hyp.finetune.yaml'):  # from utils.plots import *; plot_evolution()
+    # Plot hyperparameter evolution results in evolve.txt
+    with open(yaml_file) as f:
+        hyp = yaml.load(f, Loader=yaml.SafeLoader)
+    x = np.loadtxt('evolve.txt', ndmin=2)
+    f = fitness(x)
+    # weights = (f - f.min()) ** 2  # for weighted results
+    plt.figure(figsize=(10, 12), tight_layout=True)
+    matplotlib.rc('font', **{'size': 8})
+    for i, (k, v) in enumerate(hyp.items()):
+        y = x[:, i + 7]
+        # mu = (y * weights).sum() / weights.sum()  # best weighted result
+        mu = y[f.argmax()]  # best single result
+        plt.subplot(6, 5, i + 1)
+        plt.scatter(y, f, c=hist2d(y, f, 20), cmap='viridis', alpha=.8, edgecolors='none')
+        plt.plot(mu, f.max(), 'k+', markersize=15)
+        plt.title('%s = %.3g' % (k, mu), fontdict={'size': 9})  # limit to 40 characters
+        if i % 5 != 0:
+            plt.yticks([])
+        print('%15s: %.3g' % (k, mu))
+    plt.savefig('evolve.png', dpi=200)
+    print('\nPlot saved as evolve.png')
 
 def save_one_box(xyxy, im, file='image.jpg', gain=1.02, pad=10, square=False, BGR=False, save=True):
     # Save image crop as {file} with crop size multiple {gain} and {pad} pixels. Save and/or return crop

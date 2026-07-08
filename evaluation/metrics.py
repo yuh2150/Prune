@@ -98,7 +98,7 @@ class MetricCollector:
         ap, ap_class, ap50 = [], [], []
         
         if len(stats_np) and stats_np[0].any():
-            _, _, p, r, ap, f1, ap_class = ap_per_class(
+            _, _, p, r, f1, ap, ap_class = ap_per_class(
                 *stats_np, plot=plots, v5_metric=v5_metric, save_dir=save_dir, names=names
             )
             ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95

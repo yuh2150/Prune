@@ -48,7 +48,11 @@ def set_logging(name=None, verbose=True):
     # Sets level and returns logger
     for h in logging.root.handlers:
         logging.root.removeHandler(h)  # remove all handlers associated with the root logger object
-    rank = int(os.getenv('RANK', -1))  # rank in world for Multi-GPU trainings
+    if isinstance(name, int):
+        rank = name
+        name = None
+    else:
+        rank = int(os.getenv('RANK', -1))  # rank in world for Multi-GPU trainings
     logging.basicConfig(format="%(message)s", level=logging.INFO if (verbose and rank in (-1, 0)) else logging.WARNING)
     return logging.getLogger(name)
 
@@ -382,11 +386,18 @@ def check_dataset(data, autodownload=True):
         with open(data, errors='ignore') as f:
             data = yaml.safe_load(f)  # dictionary
 
-    # Parse yaml
     path = extract_dir or Path(data.get('path') or '')  # optional 'path' default to '.'
     for k in 'train', 'val', 'test':
-        if data.get(k):  # prepend path
-            data[k] = str(path / data[k]) if isinstance(data[k], str) else [str(path / x) for x in data[k]]
+        if data.get(k):
+            def prepend(x):
+                if not x:
+                    return x
+                p_norm = Path(path).resolve()
+                x_norm = Path(x).resolve()
+                if p_norm == x_norm or p_norm in x_norm.parents or Path(x).is_absolute():
+                    return x
+                return str(path / x)
+            data[k] = prepend(data[k]) if isinstance(data[k], str) else [prepend(x) for x in data[k]]
 
     assert 'nc' in data, "Dataset 'nc' key missing."
     if 'names' not in data:
@@ -507,7 +518,7 @@ def labels_to_class_weights(labels, nc=80):
         return torch.Tensor()
 
     labels = np.concatenate(labels, 0)  # labels.shape = (866643, 5) for COCO
-    classes = labels[:, 0].astype(np.int)  # labels = [class xywh]
+    classes = labels[:, 0].astype(int)  # labels = [class xywh]
     weights = np.bincount(classes, minlength=nc)  # occurrences per class
 
     # Prepend gridpoint count (for uCE training)
@@ -522,7 +533,7 @@ def labels_to_class_weights(labels, nc=80):
 
 def labels_to_image_weights(labels, nc=80, class_weights=np.ones(80)):
     # Produces image weights based on class_weights and image contents
-    class_counts = np.array([np.bincount(x[:, 0].astype(np.int), minlength=nc) for x in labels])
+    class_counts = np.array([np.bincount(x[:, 0].astype(int), minlength=nc) for x in labels])
     image_weights = (class_weights.reshape(1, nc) * class_counts).sum(1)
     # index = random.choices(range(n), weights=image_weights, k=1)  # weight image sample
     return image_weights
@@ -744,7 +755,10 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
 def strip_optimizer(f='best.pt', s=''):  # from utils.general import *; strip_optimizer()
     # Strip optimizer from 'f' to finalize training, optionally save as 's'
-    x = torch.load(f, map_location=torch.device('cpu'))
+    try:
+        x = torch.load(f, map_location=torch.device('cpu'), weights_only=False)
+    except TypeError:
+        x = torch.load(f, map_location=torch.device('cpu'))
     if x.get('ema'):
         x['model'] = x['ema']  # replace model with ema
     for k in 'optimizer', 'best_fitness', 'wandb_id', 'ema', 'updates':  # keys

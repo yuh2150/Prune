@@ -150,7 +150,10 @@ def profile(input, ops, n=10, device=None):
 def is_parallel(model):
     # Returns True if model is of type DP or DDP
     return type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel)
-
+    
+def intersect_dicts(da, db, exclude=()):
+    # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using da values
+    return {k: v for k, v in da.items() if k in db and not any(x in k for x in exclude) and v.shape == db[k].shape}
 
 def de_parallel(model):
     # De-parallelize a model: returns single-GPU model if model is of type DP or DDP
