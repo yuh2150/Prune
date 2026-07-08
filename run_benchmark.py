@@ -21,7 +21,8 @@ def main():
     
     models = {
         'Baseline': 'yolov5s.pt',
-        'Pruned': 'yolov5s-pruned.pt'
+        'Pruned': 'yolov5s-pruned.pt',
+        'Fine-tuned-50epochs': 'runs/train/exp15/weights/best.pt'
     }
     
     results_list = []

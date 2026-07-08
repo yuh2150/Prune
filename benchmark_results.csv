@@ -1,3 +1,4 @@
 Model Name,Weight File,Parameters,GFLOPs,Precision (P),Recall (R),mAP@0.5,mAP@0.5:0.95,Inference Speed (ms/img),NMS Speed (ms/img),Total Latency (ms/img)
-Baseline,yolov5s.pt,7225885,16.436,0.6645,0.5239,0.5634,0.361,1.22,1.06,2.28
-Pruned,yolov5s-pruned.pt,5933813,14.317,0.6164,0.3686,0.4037,0.2316,1.14,0.96,2.09
+Baseline,yolov5s.pt,7225885,16.436,0.6645,0.5239,0.5634,0.361,1.27,1.21,2.48
+Pruned,yolov5s-pruned.pt,5933813,14.317,0.6164,0.3686,0.4037,0.2316,1.17,1.08,2.25
+Fine-tuned-50epochs,runs/train/exp15/weights/best.pt,5933813,14.317,0.5855,0.4301,0.4433,0.2679,1.17,1.4,2.58
