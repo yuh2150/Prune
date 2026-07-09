@@ -13,7 +13,7 @@ class DummyOptions:
 
 def main():
     # Options
-    data_path = 'data/coco.yaml'
+    data_path = 'data/coco500.yaml'
     # Use GPU if available, else CPU
     import torch
     device = '0' if torch.cuda.is_available() else 'cpu'
@@ -22,7 +22,7 @@ def main():
     models = {
         'Baseline': 'yolov5s.pt',
         'Pruned': 'yolov5s-pruned.pt',
-        'Fine-tuned-50epochs': 'runs/train/exp15/weights/best.pt'
+        'Fine-tuned-50epochs': 'yolov5s-pruned-finetuned.pt'
     }
     
     results_list = []
@@ -39,7 +39,7 @@ def main():
             results, maps, speed, params, flops = evaluate(
                 data=data_path,
                 weights=weights,
-                batch_size=32,
+                batch_size=1,
                 imgsz=640,
                 conf_thres=0.001,
                 iou_thres=0.6,

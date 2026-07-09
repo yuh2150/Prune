@@ -84,7 +84,7 @@ def main():
     ax3 = axes[2]
     rects5 = ax3.bar(models, df['Total Latency (ms/img)'], width=0.5, color=['#FF7F0E', '#2CA02C'])
     
-    ax3.set_title("Total Latency on GPU (ms/image)", fontsize=14, fontweight='bold', pad=15)
+    ax3.set_title("Total Latency (ms/image)", fontsize=14, fontweight='bold', pad=15)
     ax3.set_ylabel("Latency (ms)", fontsize=12)
     # Give some headroom on y-axis
     ax3.set_ylim(0, max(df['Total Latency (ms/img)']) * 1.3)
