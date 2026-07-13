@@ -26,6 +26,7 @@ def select(output, parameters, flops, params_layers, flops_layers, params_map, f
             a.append(float(lis[i]))
         return a
 
+    layer_name_map = {}
     for idx, file in enumerate(sorted(os.listdir(output))):
         name = Path(file).stem
         rate = name.split('_')
@@ -39,14 +40,28 @@ def select(output, parameters, flops, params_layers, flops_layers, params_map, f
         
         with open(os.path.join(output, file), 'r') as f:
             for line in f:
-                if len(line) > 2:
+                line_str = line.strip()
+                if line_str.startswith('[') or line_str.startswith(']'):
+                    continue
+                if line_str.endswith(','):
+                    line_str = line_str[:-1]
+                if len(line_str) > 2:
                     try:
-                        a = clean(line, char='() []')
-                        temp_layer.append(a[0])
-                        temp_precision.append(a[4])
-                        temp_params.append(parameters - a[-2])
-                        temp_flps.append(flops - a[-1])
-                    except Exception:
+                        cleaned_line = line_str.replace('np.float64', '').replace('np.float32', '').replace('np.float16', '')
+                        import ast
+                        val = ast.literal_eval(cleaned_line)
+                        
+                        layer_id = val[0]
+                        metrics_tuple = val[1]
+                        
+                        seq_idx = len(temp_layer)
+                        layer_name_map[seq_idx] = layer_id
+                        
+                        temp_layer.append(seq_idx)
+                        temp_precision.append(metrics_tuple[2])
+                        temp_params.append(parameters - metrics_tuple[6])
+                        temp_flps.append(flops - metrics_tuple[7])
+                    except Exception as e:
                         continue
                         
         if len(temp_layer) < 10:
@@ -161,20 +176,21 @@ def select(output, parameters, flops, params_layers, flops_layers, params_map, f
             layers[(num, rates[r])] = 'params'
 
     # Print selection analysis table to console
-    print("\n" + "="*85)
-    print(f"{'LAYER SELECTION DECISION ANALYSIS':^85}")
-    print("="*85)
+    print("\n" + "="*110)
+    print(f"{'LAYER SELECTION DECISION ANALYSIS':^110}")
+    print("="*110)
     print(f"Params Selection: Cutoff threshold = {params_threshold:,.3e} (Max score = {max_p_param:,.3e})")
     print(f"FLOPS Selection:  Cutoff threshold = {flops_threshold:,.3e} (Max score = {max_p_flop:,.3e})")
-    print("-"*85)
-    print(f"{'Layer':^8} | {'Selected For':^15} | {'Rate':^8} | {'Param Score':^15} | {'FLOPS Score':^15}")
-    print("-"*85)
+    print("-"*110)
+    print(f"{'Layer Name':<45} | {'Selected For':^15} | {'Rate':^8} | {'Param Score':^15} | {'FLOPS Score':^15}")
+    print("-"*110)
     for (num, rate) in sorted(layers.keys()):
         rate_idx = rates.index(rate)
         p_score = params_val[rate_idx][num]
         f_score = flps_val[rate_idx][num]
-        print(f"{num:^8d} | {layers[(num, rate)]:^15} | {rate:^8.2%} | {p_score:^15.3e} | {f_score:^15.3e}")
-    print("="*85 + "\n")
+        layer_name = layer_name_map.get(num, str(num))
+        print(f"{layer_name:<45} | {layers[(num, rate)]:^15} | {rate:^8.2%} | {p_score:^15.3e} | {f_score:^15.3e}")
+    print("="*110 + "\n")
 
     # Saving SA diagrams
     if save:
@@ -233,7 +249,8 @@ def select(output, parameters, flops, params_layers, flops_layers, params_map, f
             
         for val in layers:
             col = 'royalblue' if layers[val] == 'FLOPS' else ('limegreen' if layers[val] == 'params' else 'red')
-            ax0.scatter(val[0], precision[int(val[1] / 0.25 - 1)][val[0]], color=col, edgecolor='black', s=80, zorder=5)
+            rate_idx = rates.index(val[1])
+            ax0.scatter(val[0], precision[rate_idx][val[0]], color=col, edgecolor='black', s=80, zorder=5)
         
         # Add dummy plots for clean legend
         ax0.scatter([], [], color='limegreen', edgecolor='black', s=80, label='Selected (Params)')
@@ -296,7 +313,10 @@ def select(output, parameters, flops, params_layers, flops_layers, params_map, f
 
         print(f'Sensitivity analysis graphs (including scores) are saved in {folder}')
 
-    return str(list(layers.keys()))
+    final_params = []
+    for (num, rate) in sorted(layers.keys()):
+        final_params.append((layer_name_map.get(num, num), rate))
+    return str(final_params)
 
 
 if __name__ == '__main__':
@@ -315,3 +335,5 @@ if __name__ == '__main__':
     layers = \
         select(opt.output, opt.params, opt.flops, opt.params_layers, opt.flops_layers, opt.params_map,
                opt.flops_map, opt.save)
+    print("\n>>> SELECTED PRUNING PARAMETERS:")
+    print(layers)

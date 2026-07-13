@@ -11,7 +11,7 @@ from utils.general import coco80_to_coco91_class, scale_coords, xyxy2xywh
 from utils.torch_utils import time_synchronized, select_device
 
 from evaluation.config import init_evaluation_env
-from evaluation.model_adapter import YOLOAdapter, DETRAdapter, ModelLoader
+from evaluation.model_adapter import YOLOAdapter, DETRAdapter, ModelLoader, ModelAdapterFactory
 from evaluation.dataset import build_dataloader
 from evaluation.metrics import DetectionEvaluator
 from evaluation.results import save_label_txt, save_plots, save_predictions_json, print_results, print_speed, log_to_wandb
@@ -44,7 +44,8 @@ def evaluate(data,
              criterion=0,
              opt=None,
              model_adapter=None,
-             dataset_adapter=None):
+             dataset_adapter=None,
+             training=None):
     """
     Standardized validation evaluation function. Handles loading/profiling models,
     processing dataloader iterations, calculating precision/recall/mAP metrics,
@@ -53,18 +54,14 @@ def evaluate(data,
     if pruning_params is None:
         pruning_params = []
         
-    # Auto-detect if using a DETR model
-    is_detr = False
-    if model is not None:
-        is_detr = 'detr' in str(type(model)).lower()
-    elif weights is not None:
-        is_detr = any('detr' in str(w).lower() for w in (weights if isinstance(weights, list) else [weights]))
-
     if model_adapter is None:
-        model_adapter = DETRAdapter() if is_detr else YOLOAdapter()
+        model_adapter = ModelAdapterFactory.get_adapter(weights, model)
         
-    training = model is not None
+    is_detr = isinstance(model_adapter, DETRAdapter)
     
+    if training is None:
+        training = model is not None
+        
     if training:
         device = next(model.parameters()).device
         gs = max(int(model.stride.max()), 32) if hasattr(model, 'stride') else 32
@@ -87,18 +84,24 @@ def evaluate(data,
             save_txt=save_txt
         )
         
-        # Model loading & structural tuning
-        modification = opt.modification if opt and hasattr(opt, 'modification') else ''
-        model, params, fs, gs = ModelLoader.load_model(
-            weights=weights,
-            modification=modification,
-            pruning_params=pruning_params,
-            criterion=criterion,
-            device=device,
-            imgsz=imgsz,
-            trace=trace,
-            half_precision=half_precision
-        )
+        if model is None:
+            # Model loading & structural tuning
+            modification = opt.modification if opt and hasattr(opt, 'modification') else ''
+            model, params, fs, gs = ModelLoader.load_model(
+                weights=weights,
+                modification=modification,
+                pruning_params=pruning_params,
+                criterion=criterion,
+                device=device,
+                imgsz=imgsz,
+                trace=trace,
+                half_precision=half_precision
+            )
+        else:
+            device = next(model.parameters()).device
+            gs = max(int(model.stride.max()), 32) if hasattr(model, 'stride') else 32
+            params = sum(x.numel() for x in model.parameters())
+            fs = 0.0
         
     # Set model state
     model.eval()
@@ -151,7 +154,10 @@ def evaluate(data,
     
     # Validation loop
     pbar = tqdm(dataset_adapter, desc=s)
+    max_batches = getattr(opt, 'max_eval_batches', None) if opt else None
     for batch_i, (img, targets, paths, shapes) in enumerate(pbar):
+        if max_batches is not None and batch_i >= max_batches:
+            break
         img = model_adapter.preprocess(img, device, half=half)
         targets = targets.to(device)
         nb, _, height, width = img.shape

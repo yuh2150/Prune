@@ -207,21 +207,20 @@ def prune_structured(model, pruning_params, criterion, tiny=False):
             p.requires_grad = grad_states[name]
         
         with torch.no_grad():
+            from evaluation.model_adapter import PrunerAdapterFactory
+            pruner = PrunerAdapterFactory.get_pruner("", model=model)
+            prunable_layers_info = pruner.get_prunable_layers(model)
+            prunable_modules = [layer.module for layer in prunable_layers_info]
+
             for layer_idx, amount in pruning_params:
                 if layer_idx < 0 or layer_idx >= len(conv_layers):
                     continue
                 target_conv = conv_layers[layer_idx]
                 out_channels = target_conv.out_channels
                 
-                # Skip if it is a Detect layer head output
-                is_detect = False
-                for m in model.modules():
-                    if 'detect' in m.__class__.__name__.lower():
-                        if target_conv in m.modules():
-                            is_detect = True
-                            break
-                if is_detect:
-                    print(f"Skipping Detect layer conv at index {layer_idx}")
+                # Skip if it is not in the prunable modules list defined by the model's adapter
+                if target_conv not in prunable_modules:
+                    print(f"Skipping non-prunable/output layer at index {layer_idx}")
                     continue
                     
                 n_pruned = make_divisible(amount * out_channels, 2)
