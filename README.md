@@ -1,17 +1,17 @@
-# Model Pruning & Sensitivity Analysis Framework (YOLOv5s & DETR)
+# Model Pruning & Sensitivity Analysis Framework (YOLOv5 & RT-DETR)
 
-A robust, SOLID-compliant structured pruning and sensitivity analysis framework for deep learning architectures, specifically supporting **YOLOv5s** and **DETR (DEtection TRansformer)** families.
+A robust, SOLID-compliant structured/unstructured pruning and sensitivity analysis framework for deep learning architectures, supporting **YOLOv5** and **RT-DETR (Real-Time DEtection TRansformer)** families.
 
 ---
 
 ## 🌟 Key Features
 
-* **SOLID Architecture Design**: Bypasses hardcoding by using dynamic Model Adapters (`ModelAdapter`, `DETRPrunerAdapter`, `YOLOv5PrunerAdapter`). Highly extensible to support future models such as RT-DETR or YOLOv8.
-* **Support for Transformer Architectures (DETR)**:
-  * Dynamic CNN Backbone scaling supporting **ResNet-18**, **ResNet-34**, **ResNet-50**, and **ResNet-101**.
-  * Custom `FrozenBatchNormPruner` registered in `torch_pruning` to avoid tensor shape mismatch crashes.
-  * Attention-protection to guard the `input_proj` projection layer during pruning.
-* **Isolated Dataloading**: Dynamic namespace isolation of `datasets.coco` prevents shadowing conflicts with the Hugging Face `datasets` library from `site-packages`.
+* **SOLID Architecture Design**: Bypasses hardcoding by using dynamic Model Adapters (`ModelAdapter`, `DETRPrunerAdapter`, `YOLOv5PrunerAdapter`). Highly extensible to support future models.
+* **Hugging Face RT-DETR Integration**:
+  * Native support for `RTDetrForObjectDetection` and `RTDetrImageProcessor` from Hugging Face `transformers`.
+  * Dynamic channel pruning of RT-DETR ResNet/HGNet backbones, encoders, and decoders using `torch_pruning`.
+  * Auto-exclusion/protection for input projection layers, bbox predictors, classifier embed heads, and residual additions.
+* **Isolated Dataloading**: Dynamic namespace isolation of `datasets.coco` and `dataset_coco_rtdetr` prevents shadowing conflicts with the Hugging Face `datasets` library from `site-packages`.
 * **Hardware-Accelerated Evaluations**: Fully supports CPU and GPU (CUDA) execution with customizable batch evaluation caps to prevent system swapping and Out-of-Memory (OOM) errors.
 
 ---
@@ -25,7 +25,7 @@ Run the scripts in a Python environment with the following dependencies installe
 conda activate env_cv
 
 # Install core and analysis packages
-pip install torch-pruning pycocotools tqdm pandas openpyxl matplotlib
+pip install torch-pruning pycocotools tqdm pandas openpyxl matplotlib transformers
 ```
 
 ---
@@ -35,27 +35,17 @@ pip install torch-pruning pycocotools tqdm pandas openpyxl matplotlib
 Below is the step-by-step workflow for Sensitivity Analysis, Layer Selection, Evaluation, and Fine-tuning.
 
 ### 1. Sensitivity Analysis
-To evaluate the impact of pruning individual layers, run the sensitivity analysis script. This applies structured pruning with `--modification prune-structured` at specified pruning rates (e.g. `[0.25, 0.5, 0.75]`), writing results to a specified output file.
+To evaluate the impact of pruning individual layers, run the sensitivity analysis. This applies structured pruning layer-by-layer at specified pruning rates (e.g., `0.3`), writing results to a specified output file.
 
 #### 📊 YOLOv5s Sensitivity Analysis:
 ```bash
-python sensitivity_analysis.py --data data/coco.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights yolov5s.pt --name yolov5s_640_sensitivity --modification prune-structured --prune-output yolov5s_sensitivity.txt --pruning-rate "[0.25, 0.5, 0.75]"
+python sensitivity_analysis.py --data data/coco.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights yolov5s.pt --name yolov5s_640_sensitivity --modification prune-structured --prune-output yolov5s_sensitivity.txt --pruning-rate "[0.05, 0.10, 0.20, 0.30, 0.50 , 0.75]"
 ```
 
-#### 📊 DETR ResNet-18 Sensitivity Analysis:
-Create a placeholder file (or load your own checkpoint) to automatically initialize DETR with a ResNet-18 backbone:
+#### 📊 RT-DETR-R18 Sensitivity Analysis:
+RT-DETR sensitivity analysis evaluates all 56 prunable convolutional layers in the backbone, encoder, and decoder.
 ```bash
-# Create placeholder weights (if needed)
-touch detr_resnet18.pt
-
-# Run sensitivity analysis
-python sensitivity_analysis.py --weights detr_resnet18.pt --data coco --img-size 800 --batch-size 2 --device 0 --name detr_resnet18_sensitivity --modification prune-structured --pruning-rate "[0.25, 0.5, 0.75]" --prune-output detr_resnet18_sensitivity.txt
-```
-
-#### 📊 RT-DETR-R18 (Pretrained) Sensitivity Analysis:
-RT-DETR models are loaded with official COCO pretrained weights directly from Baidu's PyTorch Hub repository. They require exactly `640x640` input image size (which is automatically configured by our adapter):
-```bash
-python sensitivity_analysis.py --weights rtdetr_r18vd --data coco --img-size 640 --batch-size 2 --device 0 --name rtdetr_r18vd_sensitivity --modification prune-structured --pruning-rate "[0.25, 0.5, 0.75]" --prune-output rtdetr_sensitivity.txt
+python test_rtdetr.py --data data/coco_1000.yaml --weights PekingU/rtdetr_r18vd --batch-size 32 --device 0 --ann-file ./coco/annotations/instances_val2017.json --img-dir ./coco/images/val2017 --name rtdetr_r18vd_sensitivity --task pruning_sensitivity_analysis --pruning-rate "[0.05, 0.10, 0.20, 0.25, 0.50, 0.75]" --modification prune-structured
 ```
 
 #### 📂 Output Format
@@ -63,20 +53,14 @@ The resulting output file contains a list of tuples for each layer and pruning r
 ```python
 (layer_name, metrics, timing, num_params, flops)
 ```
-* **`layer_name`**: Name of the pruned module (e.g. `backbone.0.body.conv1`).
+* **`layer_name`**: Index of the pruned module (or name/string depending on model adapter).
 * **`metrics`**: A tuple containing:
-  * Mean Recall value
-  * Mean Precision value
+  * Mean Recall value (0.0 placeholder for RT-DETR)
+  * Mean Precision value (0.0 placeholder for RT-DETR)
   * Mean Average Precision at IoU 0.50 (mAP@.50)
   * Mean Average Precision from IoU 0.50 to 0.95 (mAP@.50:.95)
   * List of mAP values for all classes
-* **`timing`**: A tuple containing:
-  * Time taken for inference
-  * Time taken for Non-Maximum Suppression (NMS)
-  * Combined time for inference and NMS
-  * Height of the image
-  * Width of the image
-  * Batch size used
+* **`timing`**: A tuple containing timing details and shapes.
 * **`num_params`**: Number of parameters in the model.
 * **`flops`**: GFLOPs of the model.
 
@@ -90,15 +74,10 @@ Once the sensitivity analysis is complete, select the pruning parameters automat
 python layer_selection.py --output output/yolov5s --params 7225885 --flops 16.436 --params-layers 6 --flops-layers 5
 ```
 
-#### 📊 DETR ResNet-18 Layer Selection:
-*(Note: Since GFLOPs calculation is bypassed for DETR and defaults to `0.0`, we set `--flops 0.0` and `--flops-layers 0`)*:
-```bash
-python layer_selection.py --output output/detr_resnet18 --params 28813704 --flops 0.0 --params-layers 3 --flops-layers 0
-```
-
 #### 📊 RT-DETR-R18 Layer Selection:
+Use the baseline parameters and GFLOPs (obtained from running baseline evaluation or printed at start of sensitivity) to select target layers:
 ```bash
-python layer_selection.py --output output/rtdetr_r18vd --params 21955472 --flops 0.0 --params-layers 3 --flops-layers 0
+python layer_selection.py --output output/rtdetr_r18vd --params 20161384 --flops 60.287 --params-layers 6 --flops-layers 5
 ```
 
 | Option | Description |
@@ -119,24 +98,24 @@ Test the model's accuracy under the selected pruning parameters to determine if 
 python test.py --data data/coco128.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights yolov5s.pt --name yolov5s_val --modification prune-structured --pruning-params "[(0, 0.25), (42, 0.5), (45, 0.5), (48, 0.25)]"
 ```
 
-#### DETR ResNet-18 Evaluation:
-```bash
-python test.py --data coco --img-size 800 --batch-size 2 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights detr_resnet18.pt --name detr_resnet18_val --modification prune-structured --pruning-params "[(2, 0.25), (10, 0.5)]"
-```
-
 #### RT-DETR-R18 Evaluation:
+Evaluate the RT-DETR model with specific layer pruning parameters:
 ```bash
-python test.py --data coco --img-size 640 --batch-size 2 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights rtdetr_r18vd --name rtdetr_r18vd_val --modification prune-structured --pruning-params "[('model.backbone.res_layers.0.blocks.0.branch2a.conv', 0.25)]"
+# Structured Pruning Evaluation
+python test_rtdetr.py --data data/coco_5.yaml --weights PekingU/rtdetr_r18vd --batch-size 8 --device 0 --ann-file ./coco/annotations/instances_val2017.json --img-dir ./coco/images/val2017 --task baseline --modification prune-structured --pruning-params "[(12, 0.3), (13, 0.3)]"
+
+# Unstructured Pruning Evaluation
+python test_rtdetr.py --data data/coco_5.yaml --weights PekingU/rtdetr_r18vd --batch-size 8 --device 0 --ann-file ./coco/annotations/instances_val2017.json --img-dir ./coco/images/val2017 --task baseline --modification prune-unstructured --pruning-rate 0.3
 ```
 
 ---
 
-### 4. Fine-Tuning with the Pruning Parameters
-Apply structured pruning and fine-tune simultaneously to restore any accuracy loss from pruning:
+### 4. Performing Model Pruning and Exporting Weights
+Export the pruned model weights once you select or test specific layer indices:
 
-#### YOLOv5s Fine-tuning:
+#### RT-DETR-R18 Model Pruning:
 ```bash
-python train.py --device 0 --batch-size 32 --data data/coco128.yaml --img-size 640 --weights yolov5s.pt --name yolov5s_fine_tuned --pruning-params "[(0, 0.25), (42, 0.5), (45, 0.5), (48, 0.25)]" --criterion 0
+python prune_rtdetr.py --weights PekingU/rtdetr_r18vd --output-path pruned_rtdetr.pt --pruning-params "[(12, 0.3), (13, 0.3)]" --criterion 0 --modification prune-structured
 ```
 
 ---
@@ -159,5 +138,8 @@ Prune/
 ├── layer_selection.py        # Automatic layer selection using genetic/constrained search
 ├── test.py                   # Script for testing model on validation set
 ├── train.py                  # Script for model training and fine-tuning
+├── dataset_coco_rtdetr.py    # Custom COCO dataset wrapper for RT-DETR
+├── prune_rtdetr.py           # CLI script to prune RT-DETR models structured/unstructured
+├── test_rtdetr.py            # CLI script to evaluate and run sensitivity analysis for RT-DETR
 └── README.md                 # Project documentation (this file)
 ```

@@ -36,7 +36,7 @@ def run_sensitivity_analysis(opt, evaluate_fn):
     
     for rate in rate_list:
         prune_output = os.path.join(folder, opt.prune_output.replace('.txt', '_' + str(int(100 * rate)) + '.txt'))
-        with open(prune_output, "a") as f:
+        with open(prune_output, "w") as f:
             print("[", file=f)
             
         for i in range(conv_layers):
