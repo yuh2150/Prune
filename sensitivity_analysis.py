@@ -8,7 +8,7 @@ from evaluation.sensitivity import run_sensitivity_analysis
 def evaluate_wrapper(data, weights=None, batch_size=32, imgsz=640, conf_thres=0.001, iou_thres=0.6,
                      save_json=False, single_cls=False, augment=False, verbose=False,
                      save_txt=False, save_hybrid=False, save_conf=False, trace=False,
-                     v5_metric=False, pruning_params=None, plots=False, model=None):
+                     v5_metric=False, pruning_params=None, plots=False):
     """Wrapper to map run_sensitivity_analysis parameters to the evaluate function."""
     return evaluate(
         data=data,
@@ -29,9 +29,7 @@ def evaluate_wrapper(data, weights=None, batch_size=32, imgsz=640, conf_thres=0.
         pruning_params=pruning_params,
         criterion=opt.criterion,
         plots=plots,
-        opt=opt,
-        model=model,
-        training=False
+        opt=opt
     )
 
 if __name__ == '__main__':
@@ -59,12 +57,9 @@ if __name__ == '__main__':
     parser.add_argument('--project', default='runs/test', help='save to project/name')
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-    parser.add_argument('--max-eval-batches', type=int, default=None, help='maximum number of batches to evaluate for speed')
 
     opt = parser.parse_args()
-    import os
-    if not os.path.isdir(opt.data):
-        opt.data = check_file(opt.data)
+    opt.data = check_file(opt.data)
     opt.pruning_rate = ast.literal_eval(opt.pruning_rate)
     
     pruning_params_parsed = []

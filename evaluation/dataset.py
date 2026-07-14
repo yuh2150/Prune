@@ -122,12 +122,8 @@ class DETRDatasetAdapter(DatasetAdapter):
                 if "boxes" in tgt and "labels" in tgt:
                     boxes = tgt["boxes"]  # normalized cxcywh [M, 4]
                     labels = tgt["labels"]  # class ids [M]
-                    from utils.general import coco80_to_coco91_class
-                    coco91_to_coco80 = {v: k for k, v in enumerate(coco80_to_coco91_class())}
                     for box, label in zip(boxes.tolist(), labels.tolist()):
-                        mapped_lbl = coco91_to_coco80.get(int(label), -1)
-                        if mapped_lbl != -1:
-                            yolo_targets_list.append([i, mapped_lbl, *box])
+                        yolo_targets_list.append([i, label, *box])
                         
             if yolo_targets_list:
                 yolo_targets = torch.tensor(yolo_targets_list, dtype=torch.float32)
@@ -149,19 +145,10 @@ class DETRDatasetAdapter(DatasetAdapter):
 
     @property
     def class_names(self):
-        from utils.general import coco80_to_coco91_class
-        coco91_to_coco80 = {v: k for k, v in enumerate(coco80_to_coco91_class())}
-        names_dict = {}
         if hasattr(self.dataset, 'coco') and hasattr(self.dataset.coco, 'cats'):
             cats = self.dataset.coco.loadCats(self.dataset.coco.getCatIds())
-            for cat in cats:
-                c91 = cat['id']
-                if c91 in coco91_to_coco80:
-                    c80 = coco91_to_coco80[c91]
-                    names_dict[c80] = cat['name']
-        if not names_dict:
-            names_dict = {i: f'class_{i}' for i in range(self.num_classes)}
-        return names_dict
+            return {cat['id']: cat['name'] for cat in cats}
+        return {i: f'class_{i}' for i in range(self.num_classes)}
 
     @property
     def img_files(self):
@@ -177,49 +164,15 @@ def build_dataloader(data, imgsz, batch_size, gs, opt, task='val', dataloader=No
     if model_type == 'detr':
         if dataloader is None:
             try:
-                import sys
-                import os
-                import torch
-                original_sys_path = list(sys.path)
-                cwd = os.getcwd()
-                if cwd not in sys.path:
-                    sys.path.insert(0, cwd)
-                    
-                # Đảm bảo đường dẫn hub của facebookresearch_detr_main nằm trong sys.path để tìm thấy 'util'
-                hub_dir = torch.hub.get_dir()
-                fb_hub_path = os.path.join(hub_dir, 'facebookresearch_detr_main')
-                if fb_hub_path not in sys.path:
-                    sys.path.insert(0, fb_hub_path)
-                    
-                # Cô lập thư viện datasets của Hugging Face trong site-packages
-                cached_datasets = {}
-                for k in list(sys.modules.keys()):
-                    if k == 'datasets' or k.startswith('datasets.'):
-                        cached_datasets[k] = sys.modules.pop(k)
-                        
-                try:
-                    from datasets.coco import build as build_coco_dataset
-                finally:
-                    sys.path = original_sys_path
-                    if fb_hub_path not in sys.path:
-                        sys.path.append(fb_hub_path)
-                    for k, v in cached_datasets.items():
-                        sys.modules[k] = v
-                        
-                is_rtdetr = False
-                if opt and hasattr(opt, 'weights'):
-                    w_str = str(opt.weights[0] if isinstance(opt.weights, list) else opt.weights).lower()
-                    is_rtdetr = 'rtdetr' in w_str
-                    
+                from datasets.coco import build as build_coco_dataset
                 class Args:
                     coco_path = opt.data if (opt and hasattr(opt, 'data')) else './coco'
                     masks = False
-                    img_size = imgsz
-                    square_resize = is_rtdetr
                 dataset = build_coco_dataset(task, Args())
                 
                 from torch.utils.data import DataLoader
                 def collate_fn(batch):
+                    batch = list(zip(*batch))
                     try:
                         import importlib
                         try:
@@ -228,12 +181,10 @@ def build_dataloader(data, imgsz, batch_size, gs, opt, task='val', dataloader=No
                             misc_module = importlib.import_module("utils.misc")
                         detr_collate = getattr(misc_module, "collate_fn")
                         return detr_collate(batch)
-                    except Exception as e:
-                        print(f"Fallback collate due to: {e}")
-                        batch = list(zip(*batch))
+                    except Exception:
                         images = torch.stack(batch[0], dim=0)
                         return images, batch[1]
-                dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=collate_fn)
+                dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=2, collate_fn=collate_fn)
             except Exception as e:
                 print(f"Warning: Failed to build DETR dataloader: {e}")
                 

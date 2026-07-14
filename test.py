@@ -30,7 +30,6 @@ def test(data,
          pruning_params=None,
          criterion=0,
          opt=None,
-         training=None,
          ):
     # Resolve opt if not passed
     if opt is None:
@@ -65,8 +64,7 @@ def test(data,
         v5_metric=v5_metric,
         pruning_params=pruning_params,
         criterion=criterion,
-        opt=opt,
-        training=training
+        opt=opt
     )
 
 if __name__ == '__main__':
@@ -100,9 +98,7 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
     opt.save_json |= opt.data.endswith('coco.yaml')
-    import os
-    if not os.path.isdir(opt.data):
-        opt.data = check_file(opt.data)  # check file
+    opt.data = check_file(opt.data)  # check file
     print(opt)
     
     # loading pruning params
