@@ -56,7 +56,19 @@ def test(data,
     
     # Load model and apply pruning if requested
     if model is None:
-        if modification == "prune-unstructured":
+        if isinstance(weights_dir, str) and (weights_dir.endswith('.pt') or weights_dir.endswith('.pth')):
+            print(f"Loading pruned model checkpoint from {weights_dir}...")
+            try:
+                ckpt = torch.load(weights_dir, map_location=device, weights_only=False)
+            except TypeError:
+                ckpt = torch.load(weights_dir, map_location=device)
+            if isinstance(ckpt, dict) and 'model_object' in ckpt:
+                model = ckpt['model_object']
+            elif isinstance(ckpt, dict) and 'model' in ckpt:
+                model = ckpt['model']
+            else:
+                model = ckpt
+        elif modification == "prune-unstructured":
             model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, structured=False)
         elif modification == "prune-structured":
             model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, structured=True)
@@ -81,8 +93,13 @@ def test(data,
                     print(f"WARNING: Model forward pass failed after structured pruning: {e}")
             
     # Load image processor and config
-    image_processor = RTDetrImageProcessor.from_pretrained(weights_dir, local_files_only=True)
-    config = RTDetrConfig.from_pretrained(weights_dir, local_files_only=True)
+    hf_dir = 'PekingU/rtdetr_r18vd' if (isinstance(weights_dir, str) and (weights_dir.endswith('.pt') or weights_dir.endswith('.pth'))) else weights_dir
+    try:
+        image_processor = RTDetrImageProcessor.from_pretrained(hf_dir, local_files_only=True)
+        config = RTDetrConfig.from_pretrained(hf_dir, local_files_only=True)
+    except Exception:
+        image_processor = RTDetrImageProcessor.from_pretrained(hf_dir, local_files_only=False)
+        config = RTDetrConfig.from_pretrained(hf_dir, local_files_only=False)
     
     # Profile params and GFLOPs
     try:

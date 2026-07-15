@@ -1,7 +1,6 @@
 import argparse
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 
 
@@ -13,7 +12,7 @@ def select(output, parameters, flops, params_layers, flops_layers, params_map, f
     flps = []
     params_val = []
     flps_val = []
-    conv_layers = 55 if 'tiny' in output else 89
+    conv_layers = 0
 
     def clean(line, char):
         a = []
@@ -178,6 +177,7 @@ def select(output, parameters, flops, params_layers, flops_layers, params_map, f
 
     # Saving SA diagrams
     if save:
+        import matplotlib.pyplot as plt
         folder = os.path.join('graphs', f'SA_{Path(output).name}')
         os.makedirs(folder, exist_ok=True)
         
@@ -315,3 +315,4 @@ if __name__ == '__main__':
     layers = \
         select(opt.output, opt.params, opt.flops, opt.params_layers, opt.flops_layers, opt.params_map,
                opt.flops_map, opt.save)
+    print(layers)  

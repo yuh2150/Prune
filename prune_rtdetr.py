@@ -17,8 +17,15 @@ def attempt_load_rtdetr(weights_dir, device):
         config (RTDetrConfig)
     """
     print(f"Loading RT-DETR model from {weights_dir}...")
-    image_processor = RTDetrImageProcessor.from_pretrained(weights_dir, local_files_only=True)
-    config = RTDetrConfig.from_pretrained(weights_dir, local_files_only=True)
+    try:
+        image_processor = RTDetrImageProcessor.from_pretrained(weights_dir, local_files_only=True)
+        config = RTDetrConfig.from_pretrained(weights_dir, local_files_only=True)
+        local = True
+    except Exception:
+        print(f"Local files not found for {weights_dir}. Attempting to download from Hugging Face Hub...")
+        image_processor = RTDetrImageProcessor.from_pretrained(weights_dir, local_files_only=False)
+        config = RTDetrConfig.from_pretrained(weights_dir, local_files_only=False)
+        local = False
     
     # Handle possible custom number of labels
     num_labels = len(config.id2label) if config.id2label else 80
@@ -27,7 +34,7 @@ def attempt_load_rtdetr(weights_dir, device):
         weights_dir,
         config=config,
         ignore_mismatched_sizes=True,
-        local_files_only=True
+        local_files_only=local
     )
     model.to(device)
     
@@ -314,3 +321,72 @@ def load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_locatio
         
     model.eval()
     return model
+
+if __name__ == '__main__':
+    import argparse
+    import ast
+    
+    parser = argparse.ArgumentParser(prog='prune_rtdetr.py')
+    parser.add_argument('--weights', type=str, default='PekingU/rtdetr_r18vd', help='HF model directory path')
+    parser.add_argument('--output-path', type=str, default='pruned_rtdetr.pt', help='output path for pruned model')
+    parser.add_argument('--pruning-params', type=str, default='', help='Pruning parameters as string')
+    parser.add_argument('--criterion', type=int, default=0, help='Pruning criterion (0=L2, etc.)')
+    parser.add_argument('--modification', type=str, default='prune-structured', help='prune-structured or prune-unstructured')
+    
+    opt = parser.parse_args()
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    pruning_params_parsed = []
+    if len(opt.pruning_params) > 0:
+        param_str = opt.pruning_params.strip()
+        open_brackets = param_str.count('[')
+        close_brackets = param_str.count(']')
+        if open_brackets > close_brackets:
+            param_str += ']' * (open_brackets - close_brackets)
+        elif close_brackets > open_brackets:
+            param_str = '[' * (close_brackets - open_brackets) + param_str
+            
+        try:
+            parsed = ast.literal_eval(param_str)
+            if isinstance(parsed, list):
+                if len(parsed) > 0 and isinstance(parsed[0], list):
+                    if len(parsed[0]) > 0 and isinstance(parsed[0][0], (tuple, list)):
+                        parsed = parsed[0]
+            pruning_params_parsed = parsed
+        except Exception as e:
+            print(f"Error parsing pruning params: {e}")
+            raise e
+            
+    structured = (opt.modification == 'prune-structured')
+    
+    print(f"Pruning model with parameters: {pruning_params_parsed}")
+    model = load_pruned_model_rtdetr(
+        weights_dir=opt.weights,
+        pruning_params=pruning_params_parsed,
+        criterion=opt.criterion,
+        map_location=device,
+        structured=structured
+    )
+    
+    # Save the model
+    if opt.output_path.endswith('.pt'):
+        # Save PyTorch checkpoint containing the state dict and architecture/config
+        ckpt = {
+            'model': model.state_dict(),
+            'config': model.config if hasattr(model, 'config') else None,
+            'model_object': model
+        }
+        torch.save(ckpt, opt.output_path)
+        print(f"Pruned model checkpoint saved to {opt.output_path}")
+    else:
+        # Save as Hugging Face folder
+        model.save_pretrained(opt.output_path)
+        try:
+            from transformers import RTDetrImageProcessor
+            image_processor = RTDetrImageProcessor.from_pretrained(opt.weights, local_files_only=True)
+            image_processor.save_pretrained(opt.output_path)
+        except Exception as e:
+            print(f"Warning: Could not save image processor: {e}")
+        print(f"Pruned Hugging Face model directory saved to {opt.output_path}")
+

@@ -64,7 +64,8 @@ def main():
                 'mAP@0.5:0.95': round(map_coco, 4),
                 'Inference Speed (ms/img)': round(inf_speed, 2),
                 'NMS Speed (ms/img)': round(nms_speed, 2),
-                'Total Latency (ms/img)': round(total_speed, 2)
+                'Total Latency (ms/img)': round(total_speed, 2),
+                'FPS': round(1000 / total_speed, 1) if total_speed > 0 else 0.0
             })
             
         except Exception as e:
