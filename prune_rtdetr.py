@@ -328,7 +328,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(prog='prune_rtdetr.py')
     parser.add_argument('--weights', type=str, default='PekingU/rtdetr_r18vd', help='HF model directory path')
-    parser.add_argument('--output-path', type=str, default='pruned_rtdetr.pt', help='output path for pruned model')
+    parser.add_argument('--output-path', type=str, default='rtdetr-pruned.pt', help='output path for pruned model')
     parser.add_argument('--pruning-params', type=str, default='', help='Pruning parameters as string')
     parser.add_argument('--criterion', type=int, default=0, help='Pruning criterion (0=L2, etc.)')
     parser.add_argument('--modification', type=str, default='prune-structured', help='prune-structured or prune-unstructured')

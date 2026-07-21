@@ -66,6 +66,19 @@ def test(data,
             model = load_pruned_model(weights, pruning_params, device)
         elif opt.modification == "prune-structured":
             model = load_pruned_model(weights, pruning_params, criterion, map_location=device)
+        elif opt.modification == "prune-layers":
+            prune_ratio = 0.2
+            if hasattr(opt, 'pruning_rate'):
+                if isinstance(opt.pruning_rate, float):
+                    prune_ratio = opt.pruning_rate
+                elif isinstance(opt.pruning_rate, list) and len(opt.pruning_rate) > 0:
+                    prune_ratio = float(opt.pruning_rate[0])
+                else:
+                    try:
+                        prune_ratio = float(opt.pruning_rate)
+                    except Exception:
+                        pass
+            model = load_pruned_model(weights, pruning_params, criterion, map_location=device, modification="prune-layers", prune_ratio=prune_ratio)
         else:
             model = attempt_load(weights, map_location=device)  # load FP32 model
         gs = max(int(model.stride.max()), 32)  # grid size (max stride)

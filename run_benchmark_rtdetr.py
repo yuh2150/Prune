@@ -6,7 +6,7 @@ import test_rtdetr
 from test_rtdetr import test
 
 class DummyOptions:
-    def __init__(self, device='', project='runs/test', name='exp', exist_ok=True, modification='', prune_output='output.txt', pruning_rate='0.5', task='val', conf_thres=0.001, iou_thres=0.6, data='data/coco500.yaml', weights='PekingU/rtdetr_r18vd', batch_size=8, img_size=640, single_cls=False, augment=False, verbose=False, save_txt=False, save_hybrid=False, save_conf=False, save_json=True, exist_ok_opt=True, no_trace=True, v5_metric=False, img_dir='./coco/images/val2017', ann_file='./coco/annotations/instances_val2017.json'):
+    def __init__(self, device='', project='runs/test', name='exp', exist_ok=True, modification='', prune_output='output.txt', pruning_rate='0.5', task='val', conf_thres=0.001, iou_thres=0.6, data='data/coco1000.yaml', weights='PekingU/rtdetr_r18vd', batch_size=8, img_size=640, single_cls=False, augment=False, verbose=False, save_txt=False, save_hybrid=False, save_conf=False, save_json=True, exist_ok_opt=True, no_trace=True, v5_metric=False, img_dir='./coco/images/val2017', ann_file='./coco/annotations/instances_val2017.json'):
         self.device = device
         self.project = project
         self.name = name
@@ -35,22 +35,21 @@ class DummyOptions:
 
 def main():
     # Options
-    data_path = 'data/coco500.yaml'
+    data_path = 'data/coco1000.yaml'
     # Use GPU if available, else CPU
     device = '0' if torch.cuda.is_available() else 'cpu'
     print(f"Running RT-DETR benchmark on device: {device}")
     
-    # We look for rtdetr-pruned.pt, then fall back to pruned_rtdetr.pt
-    pruned_weight = 'rtdetr-pruned.pt' if os.path.exists('rtdetr-pruned.pt') else 'pruned_rtdetr.pt'
+    # We look for weights/rtdetr-pruned.pt
+    pruned_weight = 'weights/rtdetr-pruned.pt'
     if not os.path.exists(pruned_weight):
         print(f"Warning: Pruned weight file '{pruned_weight}' not found. Will skip evaluating Pruned model.")
         
     models = {
         'Baseline': 'PekingU/rtdetr_r18vd',
-        'Pruned': 'rtdetr-pruned.pt',
     }
-    # if os.path.exists(pruned_weight):
-    #     models['Pruned'] = pruned_weight
+    if os.path.exists(pruned_weight):
+        models['Pruned'] = pruned_weight
         
     results_list = []
     
@@ -138,12 +137,12 @@ def main():
             print(f"Error printing summary: {e}")
         
     # Export to CSV
-    csv_file = 'benchmark_results_rtdetr.csv'
+    csv_file = 'benchmarks/benchmark_results_rtdetr.csv'
     df.to_csv(csv_file, index=False)
     print(f"\nSaved CSV report to: {os.path.abspath(csv_file)}")
     
     # Export to XLSX
-    xlsx_file = 'benchmark_results_rtdetr.xlsx'
+    xlsx_file = 'benchmarks/benchmark_results_rtdetr.xlsx'
     try:
         df.to_excel(xlsx_file, index=False)
         print(f"Saved Excel report to: {os.path.abspath(xlsx_file)}")

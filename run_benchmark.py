@@ -13,16 +13,16 @@ class DummyOptions:
 
 def main():
     # Options
-    data_path = 'data/coco500.yaml'
+    data_path = 'data/coco1000.yaml'
     # Use GPU if available, else CPU
     import torch
     device = '0' if torch.cuda.is_available() else 'cpu'
     print(f"Running benchmark on device: {device}")
     
     models = {
-        'Baseline': 'yolov5s.pt',
-        'Pruned': 'yolov5s-pruned.pt',
-        'Fine-tuned-50epochs': 'yolov5s-pruned-finetuned.pt'
+        'Baseline': 'weights/yolov5s.pt',
+        'Pruned': 'weights/yolov5s-pruned.pt',
+        'Fine-tuned-50epochs': 'weights/yolov5s-pruned-finetuned.pt'
     }
     
     results_list = []
@@ -93,12 +93,12 @@ def main():
         print(f"Latency reduced by:    {speedup:.2f}%")
 
     # Export to CSV
-    csv_file = 'benchmark_results.csv'
+    csv_file = 'benchmarks/benchmark_results.csv'
     df.to_csv(csv_file, index=False)
     print(f"\nSaved CSV report to: {os.path.abspath(csv_file)}")
     
     # Export to XLSX
-    xlsx_file = 'benchmark_results.xlsx'
+    xlsx_file = 'benchmarks/benchmark_results.xlsx'
     try:
         df.to_excel(xlsx_file, index=False)
         print(f"Saved Excel report to: {os.path.abspath(xlsx_file)}")

@@ -115,7 +115,7 @@ Export the pruned model weights once you select or test specific layer indices:
 
 #### RT-DETR-R18 Model Pruning:
 ```bash
-python prune_rtdetr.py --weights PekingU/rtdetr_r18vd --output-path pruned_rtdetr.pt --pruning-params "[(12, 0.3), (13, 0.3)]" --criterion 0 --modification prune-structured
+python prune_rtdetr.py --weights PekingU/rtdetr_r18vd --output-path rtdetr-pruned.pt --pruning-params "[(12, 0.3), (13, 0.3)]" --criterion 0 --modification prune-structured
 ```
 
 ---
