@@ -280,7 +280,198 @@ def prune_structured(model, pruning_params, criterion, tiny=False):
 
     return model
 
-def load_pruned_model(weights, pruning_params, criterion, map_location=None, save=None):
+
+def get_prunable_c3_layers(model):
+    """
+    Find every C3 / BottleneckCSP module in *model.model* (the flat layer list)
+    whose Bottleneck Sequential has length > 1, i.e. it can have at least one
+    Bottleneck removed while still leaving one remaining.
+
+    Only iterates the top-level model.model list — this intentionally excludes
+    Detect, SPPF, Conv, Upsample and Concat which are never C3 subclasses.
+
+    Args:
+        model: YOLO model instance (must have a .model attribute).
+
+    Returns:
+        list[tuple[int, nn.Module]]: (layer_id, module) pairs, where layer_id
+        is the index inside model.model.
+    """
+    from models.common import C3, BottleneckCSP
+    try:
+        from models.common import C3TR
+    except ImportError:
+        C3TR = None
+
+    prunable = []
+    if not hasattr(model, 'model'):
+        return prunable
+
+    for i, module in enumerate(model.model):
+        if not isinstance(module, (C3, BottleneckCSP)):
+            continue
+        if C3TR is not None and isinstance(module, C3TR):
+            # C3TR stores its transformer blocks under module.m.tr
+            if hasattr(module.m, 'tr') and isinstance(module.m.tr, nn.Sequential) \
+                    and len(module.m.tr) > 1:
+                prunable.append((i, module))
+        else:
+            # Standard C3 / BottleneckCSP store bottlenecks in module.m
+            if hasattr(module, 'm') and isinstance(module.m, nn.Sequential) \
+                    and len(module.m) > 1:
+                prunable.append((i, module))
+    return prunable
+
+
+def _score_bottlenecks(seq: nn.Sequential, criterion: int) -> torch.Tensor:
+    """
+    Compute a scalar importance score for every Bottleneck in *seq*.
+    Higher score = more important = should be KEPT.
+
+    Uses the 3×3 conv (cv2) weight as the representative tensor, mirroring
+    the same ``criterion`` enum used by ``determine_pruned_indices()`` for
+    structured channel pruning.
+
+    Criterion values:
+        0  – L2 norm (keep largest)   ← default for prune-layer
+        1  – L2 norm (keep smallest)
+        2  – L1 norm (keep largest)
+        3  – L1 norm (keep smallest)
+        4  – mean absolute BN γ (keep largest)
+        6  – random (ablation / baseline)
+    """
+    scores = []
+    for block in seq:
+        # cv2 is the 3×3 conv — most discriminative weight in a Bottleneck
+        w = block.cv2.conv.weight.data
+        if criterion == 0:    # L2, keep largest
+            s = torch.norm(w, p=2)
+        elif criterion == 1:  # L2, keep smallest
+            s = -torch.norm(w, p=2)
+        elif criterion == 2:  # L1, keep largest
+            s = torch.norm(w, p=1)
+        elif criterion == 3:  # L1, keep smallest
+            s = -torch.norm(w, p=1)
+        elif criterion == 4:  # BN gamma magnitude
+            s = block.cv2.bn.weight.data.abs().mean()
+        elif criterion == 6:  # random  (ablation)
+            s = torch.rand(1).squeeze()
+        else:                 # fallback → L1 largest
+            s = torch.norm(w, p=1)
+        scores.append(s.item())
+    return torch.tensor(scores, dtype=torch.float32)
+
+
+def prune_layers(model, pruning_params, criterion: int = 0):
+    """
+    Physically remove Bottleneck blocks from C3 modules using importance scoring.
+
+    For each (layer_id, remove_num) pair the function:
+      1. Scores every Bottleneck in the target C3 module via ``_score_bottlenecks``.
+      2. Removes the ``remove_num`` *lowest-scoring* blocks.
+      3. Keeps the remaining blocks in their original order.
+
+    Only C3 / BottleneckCSP modules are modified.  Detect, SPPF, Conv, Upsample
+    and Concat are never touched.
+
+    Args:
+        model:          YOLO model instance.
+        pruning_params: List of (layer_id, remove_num) tuples.
+                        layer_id  – index inside model.model.
+                        remove_num – number of Bottlenecks to drop.
+                        Example: [(4, 1)] drops the least-important Bottleneck
+                        from C3 block #4.
+        criterion:      Importance metric (same enum as determine_pruned_indices).
+                        0=L2-keep-largest, 1=L2-keep-smallest,
+                        2=L1-keep-largest (recommended), 3=L1-keep-smallest,
+                        4=BN-gamma, 6=random.
+
+    Returns:
+        model: The same model object, modified in-place.
+    """
+    from models.common import C3, BottleneckCSP
+    try:
+        from models.common import C3TR
+    except ImportError:
+        C3TR = None
+
+    if not hasattr(model, 'model'):
+        return model
+
+    with torch.no_grad():
+        for layer_id, remove_num in pruning_params:
+            if layer_id < 0 or layer_id >= len(model.model):
+                print(f"prune_layers: layer_id {layer_id} out of range — skipping.")
+                continue
+            module = model.model[layer_id]
+            if not isinstance(module, (C3, BottleneckCSP)):
+                print(f"prune_layers: model.model[{layer_id}] is "
+                      f"{type(module).__name__}, not C3/CSP — skipping.")
+                continue
+
+            # --- C3TR: no importance scoring (transformer blocks differ structurally) ---
+            if C3TR is not None and isinstance(module, C3TR):
+                if hasattr(module.m, 'tr') and isinstance(module.m.tr, nn.Sequential):
+                    n_orig = len(module.m.tr)
+                    n_new = max(1, n_orig - remove_num)
+                    if n_new < n_orig:
+                        # C3TR: keep first n_new (no weight-based scoring available)
+                        module.m.tr = nn.Sequential(*list(module.m.tr)[:n_new])
+                        print(f"  Pruned C3TR at model.model[{layer_id}]: "
+                              f"{n_orig} -> {n_new} transformer layers.")
+                continue
+
+            # --- Standard C3 / BottleneckCSP: importance-based selection ---
+            if not (hasattr(module, 'm') and isinstance(module.m, nn.Sequential)):
+                continue
+
+            seq = module.m
+            n_orig = len(seq)
+            n_new = max(1, n_orig - remove_num)
+            if n_new >= n_orig:
+                continue
+
+            if remove_num >= n_orig:
+                print(f"  WARNING: remove_num={remove_num} >= depth={n_orig} at "
+                      f"model.model[{layer_id}]; keeping 1 block.")
+
+            # Score each block; keep the n_new highest-scoring ones
+            scores = _score_bottlenecks(seq, criterion)
+            keep_idx = torch.argsort(scores, descending=True)[:n_new]
+            keep_idx = keep_idx.sort().values.tolist()   # restore sequential order
+            removed_idx = [i for i in range(n_orig) if i not in keep_idx]
+
+            module.m = nn.Sequential(*[seq[i] for i in keep_idx])
+            print(f"  Pruned C3/CSP at model.model[{layer_id}] (criterion={criterion}): "
+                  f"{n_orig} -> {n_new} blocks. "
+                  f"Removed indices {removed_idx}, kept {keep_idx}.")
+
+    return model
+
+def load_pruned_model(weights, pruning_params, criterion=0, map_location=None, save=None,
+                      modification='prune-structured'):
+    """
+    Load a YOLO checkpoint and apply either structured channel pruning or layer
+    (depth) pruning, then return the fused FP32 model ready for evaluation.
+
+    Args:
+        weights: path(s) to the .pt checkpoint.
+        pruning_params: parameter list whose meaning depends on *modification*:
+            - prune-structured: [(layer_idx, prune_rate), ...]
+            - prune-layer:      [(layer_id,  remove_num), ...]
+        criterion (int): importance criterion for structured pruning (ignored for prune-layer).
+        map_location: torch.load device override.
+        save: if given, save the pruned checkpoint to this path.
+        modification (str): 'prune-structured' (default) | 'prune-layer' | 'prune-unstructured'.
+
+    Returns:
+        model: pruned, fused, float32, eval-mode YOLO model.
+    """
+    # Allow passing a device object as the third positional arg (legacy call style)
+    if not isinstance(criterion, int) and map_location is None:
+        map_location = criterion
+        criterion = 0
+
     for w in weights if isinstance(weights, list) else [weights]:
         attempt_download(w)
         try:
@@ -288,9 +479,12 @@ def load_pruned_model(weights, pruning_params, criterion, map_location=None, sav
         except TypeError:
             ckpt = torch.load(w, map_location=map_location)
         model = ckpt['ema' if ckpt.get('ema') else 'model']
-    #model = model.float().fuse().eval())  # FP32 model
-    pruned_model = prune_structured(model, pruning_params, criterion, tiny=True) if 'tiny' in weights[0] else\
-        prune_structured(model, pruning_params, criterion)
+
+    if modification == 'prune-layer':
+        pruned_model = prune_layers(model, pruning_params, criterion=criterion)
+    else:
+        # Default: structured channel pruning (also covers 'prune-structured')
+        pruned_model = prune_structured(model, pruning_params, criterion, tiny='tiny' in weights[0])
 
     if save:
         ckpt['model'] = pruned_model
@@ -301,11 +495,25 @@ def load_pruned_model(weights, pruning_params, criterion, map_location=None, sav
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='prune.py')
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
-    parser.add_argument('--pruning-params', type=str, default='', help='Pruning parameters can be defined as "[(l_1, p_1), (l_2, p_2), (l_3, p_3), ..., (l_n, p_n)]" where l_i are the indices of the layers to prune and p_i are the corresponding pruning rates for each layer')
-    parser.add_argument('--criterion', type=int, default=0, help="Importance criterion for pruning:\n0= smallest L2-norm\n1= largest L2-norm\n2= smallest L1-norm\n3= largest L1-norm\n4= smallest batch normalization scale factor\n5= smallest batch normalization scale factor * L1-norm\n6= random")
-    parser.add_argument('--name', default=None, help='save pruned model to name')
+    parser.add_argument('--pruning-params', type=str, default='',
+                        help='List of (layer_id, value) tuples. For prune-structured: value is prune rate [0,1]. '
+                             'For prune-layer: value is number of Bottlenecks to remove. '
+                             'Example: "[(4,1),(6,1)]"')
+    parser.add_argument('--criterion', type=int, default=0,
+                        help='Importance criterion for structured pruning: '
+                             '0=smallest L2 | 1=largest L2 | 2=smallest L1 | 3=largest L1 | '
+                             '4=smallest BN scale | 5=BN scale * L1 | 6=random')
+    parser.add_argument('--modification', type=str, default='prune-structured',
+                        help='prune-structured | prune-layer')
+    parser.add_argument('--name', default=None, help='save pruned model to this path')
     opt = parser.parse_args()
+
+    pruning_params_parsed = []
     if len(opt.pruning_params) > 0:
         pruning_params_parsed = ast.literal_eval(opt.pruning_params)
-    # python prune.py --weights yolov5s.pt --pruning-params [] --criterion 0 --name yolov7-pruned.pt
-    load_pruned_model(opt.weights, pruning_params_parsed, opt.criterion, save=opt.name)
+
+    # Examples:
+    #   python prune.py --weights yolov5s.pt --modification prune-structured --pruning-params "[(0,0.3)]" --name pruned.pt
+    #   python prune.py --weights yolov5s.pt --modification prune-layer      --pruning-params "[(4,1),(6,1)]" --name layer_pruned.pt
+    load_pruned_model(opt.weights, pruning_params_parsed, opt.criterion,
+                      save=opt.name, modification=opt.modification)

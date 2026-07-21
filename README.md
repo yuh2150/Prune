@@ -35,11 +35,18 @@ pip install torch-pruning pycocotools tqdm pandas openpyxl matplotlib transforme
 Below is the step-by-step workflow for Sensitivity Analysis, Layer Selection, Evaluation, and Fine-tuning.
 
 ### 1. Sensitivity Analysis
-To evaluate the impact of pruning individual layers, run the sensitivity analysis. This applies structured pruning layer-by-layer at specified pruning rates (e.g., `0.3`), writing results to a specified output file.
+To evaluate the impact of pruning individual layers, run the sensitivity analysis. Two modes are supported via `--modification`:
 
-#### 📊 YOLOv5s Sensitivity Analysis:
+#### 📊 YOLOv5s — Structured Pruning Sensitivity Analysis:
 ```bash
-python sensitivity_analysis.py --data data/coco.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights yolov5s.pt --name yolov5s_640_sensitivity --modification prune-structured --prune-output yolov5s_sensitivity.txt --pruning-rate "[0.05, 0.10, 0.20, 0.30, 0.50 , 0.75]"
+python sensitivity_analysis.py --data data/coco.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights weights/yolov5s.pt --name yolov5s_640_sensitivity --modification prune-structured --prune-output yolov5s_sensitivity.txt --pruning-rate "[0.05, 0.10, 0.20, 0.30, 0.50 , 0.75]"
+```
+
+#### 📊 YOLOv5s — Layer (Depth) Pruning Sensitivity Analysis:
+Finds which C3 modules can have one Bottleneck removed with the smallest mAP drop.
+Importance criterion selects which Bottleneck to remove (0=L2, 2=L1, 4=BN-gamma, 6=random).
+```bash
+python sensitivity_analysis.py --data data/coco.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights weights/yolov5s.pt --name yolov5s_640_layer_sensitivity --modification prune-layer --criterion 0 --prune-output yolov5s_layer_sensitivity.txt
 ```
 
 #### 📊 RT-DETR-R18 Sensitivity Analysis:
@@ -90,12 +97,23 @@ python layer_selection.py --output output/rtdetr_r18vd --params 20161384 --flops
 
 ---
 
-### 3. Testing with the Pruning Parameters
+### 3. Testing / Pruning with the Pruning Parameters
 Test the model's accuracy under the selected pruning parameters to determine if fine-tuning is required:
 
-#### YOLOv5s Evaluation:
+#### YOLOv5s — Structured Pruning:
 ```bash
-python test.py --data data/coco128.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights yolov5s.pt --name yolov5s_val --modification prune-structured --pruning-params "[(0, 0.25), (42, 0.5), (45, 0.5), (48, 0.25)]"
+python test.py --data data/coco128.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights weights/yolov5s.pt --name yolov5s_val --modification prune-structured --pruning-params "[(0, 0.25), (42, 0.5), (45, 0.5), (48, 0.25)]"
+```
+
+#### YOLOv5s — Layer (Depth) Pruning:
+Removes the least-important Bottleneck from each specified C3 module.
+`pruning-params` format: `[(layer_id, remove_num), ...]`
+```bash
+# Evaluate on-the-fly (no save)
+python test.py --data data/coco.yaml --img-size 640 --batch-size 32 --conf-thres 0.001 --iou-thres 0.65 --device 0 --weights weights/yolov5s.pt --modification prune-layer --pruning-params "[(4,1),(6,1)]" --criterion 0
+
+# Save pruned checkpoint
+python prune.py --weights weights/yolov5s.pt --modification prune-layer --pruning-params "[(4,1),(6,1)]" --criterion 0 --name weights/yolov5s-layer-pruned.pt
 ```
 
 #### RT-DETR-R18 Evaluation:
@@ -119,6 +137,106 @@ python prune_rtdetr.py --weights PekingU/rtdetr_r18vd --output-path rtdetr-prune
 ```
 
 ---
+
+## 🔪 Layer (Depth) Pruning Pipeline — YOLOv5s
+
+Layer pruning physically removes **Bottleneck blocks** from C3 modules, reducing model depth without touching channels or filters. The least-important Bottleneck is selected via an importance criterion (`--criterion`).
+
+YOLOv5s has **2 prunable C3 blocks**: `model.model[4]` (depth=2) and `model.model[6]` (depth=3).
+
+### Step 1 — Layer Sensitivity Analysis
+
+Evaluates mAP impact of removing one Bottleneck from each prunable C3 module.  
+Output saved to `output/yolov5s/yolov5s_layer_sensitivity_*.txt`.
+
+```bash
+python sensitivity_analysis.py \
+    --weights weights/yolov5s.pt \
+    --data data/coco.yaml \
+    --img-size 640 \
+    --batch-size 32 \
+    --conf-thres 0.001 \
+    --iou-thres 0.65 \
+    --device 0 \
+    --modification prune-layer \
+    --criterion 0 \
+    --prune-output yolov5s_layer_sensitivity.txt \
+    --name yolov5s_640_layer_sensitivity \
+    --no-trace
+```
+
+**`--criterion` options:**
+
+| Value | Method | Description |
+| :---: | :--- | :--- |
+| `0` | L2 norm (default) | Keep blocks with largest L2 weight norm |
+| `2` | L1 norm | Keep blocks with largest L1 weight norm |
+| `4` | BN gamma | Keep blocks with largest BatchNorm scale factor |
+| `6` | Random | Random removal (use for ablation study only) |
+
+**Output format** — same as structured pruning SA, compatible with `layer_selection.py`:
+```
+(layer_id, (mp, mr, map50, map, [per-class maps], timing, num_params, gflops)),
+```
+
+### Step 2 — Layer Pruning & Save Checkpoint
+
+After reviewing Step 1 output, choose which C3 blocks to prune.  
+`--pruning-params` format: `[(layer_id, remove_num), ...]`
+
+```bash
+python prune.py \
+    --weights weights/yolov5s.pt \
+    --modification prune-layer \
+    --pruning-params "[(4,1),(6,1)]" \
+    --criterion 0 \
+    --name weights/yolov5s-layer-pruned.pt
+```
+
+### Step 3 — Evaluate: Baseline vs Pruned
+
+```bash
+# Baseline
+python test.py \
+    --weights weights/yolov5s.pt \
+    --data data/coco.yaml \
+    --img-size 640 \
+    --batch-size 32 \
+    --conf-thres 0.001 \
+    --iou-thres 0.65 \
+    --device 0 \
+    --no-trace
+
+# Layer-pruned
+python test.py \
+    --weights weights/yolov5s-layer-pruned.pt \
+    --data data/coco.yaml \
+    --img-size 640 \
+    --batch-size 32 \
+    --conf-thres 0.001 \
+    --iou-thres 0.65 \
+    --device 0 \
+    --no-trace
+```
+
+### (Optional) Evaluate on-the-fly without saving
+
+```bash
+python test.py \
+    --weights weights/yolov5s.pt \
+    --data data/coco.yaml \
+    --img-size 640 \
+    --batch-size 32 \
+    --conf-thres 0.001 \
+    --iou-thres 0.65 \
+    --device 0 \
+    --modification prune-layer \
+    --pruning-params "[(4,1),(6,1)]" \
+    --criterion 0 \
+    --no-trace
+```
+
+
 
 ## 📂 Project Architecture
 

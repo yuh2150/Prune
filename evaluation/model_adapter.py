@@ -202,6 +202,9 @@ class ModelLoader:
             model = load_pruned_model(weights, pruning_params, device)
         elif modification == "prune-structured":
             model = load_pruned_model(weights, pruning_params, criterion, map_location=device)
+        elif modification == "prune-layer":
+            model = load_pruned_model(weights, pruning_params, criterion,
+                                      map_location=device, modification="prune-layer")
         else:
             model = attempt_load(weights, map_location=device)
             
