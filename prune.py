@@ -313,12 +313,12 @@ def get_prunable_c3_layers(model):
         if C3TR is not None and isinstance(module, C3TR):
             # C3TR stores its transformer blocks under module.m.tr
             if hasattr(module.m, 'tr') and isinstance(module.m.tr, nn.Sequential) \
-                    and len(module.m.tr) > 1:
+                    and len(module.m.tr) >= 1:
                 prunable.append((i, module))
         else:
             # Standard C3 / BottleneckCSP store bottlenecks in module.m
             if hasattr(module, 'm') and isinstance(module.m, nn.Sequential) \
-                    and len(module.m) > 1:
+                    and len(module.m) >= 1:
                 prunable.append((i, module))
     return prunable
 
@@ -413,7 +413,7 @@ def prune_layers(model, pruning_params, criterion: int = 0):
             if C3TR is not None and isinstance(module, C3TR):
                 if hasattr(module.m, 'tr') and isinstance(module.m.tr, nn.Sequential):
                     n_orig = len(module.m.tr)
-                    n_new = max(1, n_orig - remove_num)
+                    n_new = max(0, n_orig - remove_num)
                     if n_new < n_orig:
                         # C3TR: keep first n_new (no weight-based scoring available)
                         module.m.tr = nn.Sequential(*list(module.m.tr)[:n_new])
@@ -427,13 +427,13 @@ def prune_layers(model, pruning_params, criterion: int = 0):
 
             seq = module.m
             n_orig = len(seq)
-            n_new = max(1, n_orig - remove_num)
+            n_new = max(0, n_orig - remove_num)
             if n_new >= n_orig:
                 continue
 
             if remove_num >= n_orig:
                 print(f"  WARNING: remove_num={remove_num} >= depth={n_orig} at "
-                      f"model.model[{layer_id}]; keeping 1 block.")
+                      f"model.model[{layer_id}]; keeping 0 blocks.")
 
             # Score each block; keep the n_new highest-scoring ones
             scores = _score_bottlenecks(seq, criterion)

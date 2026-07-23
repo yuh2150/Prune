@@ -1,6 +1,9 @@
 import os
 import torch
 import torch.nn as nn
+import copy
+import random
+import math
 from transformers import RTDetrForObjectDetection, RTDetrImageProcessor, RTDetrConfig
 
 def attempt_load_rtdetr(weights_dir, device):
@@ -288,7 +291,187 @@ def prune_unstructured(model, pruning_params, criterion):
         
     return model
 
-def load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=None, structured=True):
+def prune_layers_rtdetr(model, prune_ratio=0.2):
+    """
+    Prune RT-DETR by removing transformer layers only.
+    Correctly handles re-indexing of auxiliary prediction heads.
+    """
+    print(f"\n--- Starting Simplified Layer Pruning (Ratio: {prune_ratio:.2f}) ---")
+    # Create a deep copy to avoid modifying the original model instance
+    pruned_model = copy.deepcopy(model)
+    pruned_model.eval() # Ensure model is in eval mode after copy
+
+    # --- Structure Check for Hugging Face Model ---
+    # Check for the nested 'model' attribute which contains the core components
+    if not hasattr(pruned_model, 'model') or not isinstance(pruned_model.model, nn.Module):
+         print("Error: Top-level model does not have a 'model' attribute. Cannot find transformer components.")
+         return model # Return original if structure is wrong
+
+    # Access the core RTDetrModel components
+    nested_model = pruned_model.model
+    if not hasattr(nested_model, 'encoder') or not isinstance(nested_model.encoder, nn.Module):
+        print("Error: Nested 'model' attribute does not have an 'encoder' module.")
+        return model
+    if not hasattr(nested_model, 'decoder') or not isinstance(nested_model.decoder, nn.Module):
+        print("Error: Nested 'model' attribute does not have a 'decoder' module.")
+        return model
+
+    # Get encoder and decoder modules
+    encoder = nested_model.encoder
+    decoder = nested_model.decoder
+
+    # Get original layer counts safely
+    original_enc_layers = len(encoder.layers) if hasattr(encoder, 'layers') and isinstance(encoder.layers, nn.ModuleList) else 0
+    original_dec_layers = len(decoder.layers) if hasattr(decoder, 'layers') and isinstance(decoder.layers, nn.ModuleList) else 0
+
+    print(f"Original encoder layers: {original_enc_layers}")
+    print(f"Original decoder layers: {original_dec_layers}")
+
+    # --- Calculate Layers to Prune ---
+    if original_enc_layers == 0 and original_dec_layers == 0:
+        print("Model has no encoder or decoder layers. Skipping pruning.")
+        if not hasattr(pruned_model, 'num_encoder_layers'): pruned_model.num_encoder_layers = 0
+        if not hasattr(pruned_model, 'num_decoder_layers'): pruned_model.num_decoder_layers = 0
+        return pruned_model
+
+    enc_layers_to_prune = math.ceil(original_enc_layers * prune_ratio) if original_enc_layers > 0 else 0
+    dec_layers_to_prune = math.ceil(original_dec_layers * prune_ratio) if original_dec_layers > 0 else 0
+
+    # Ensure we don't prune all layers if layers exist and pruning is attempted
+    enc_layers_to_prune = min(enc_layers_to_prune, original_enc_layers - 1) if original_enc_layers > 1 else 0
+    dec_layers_to_prune = min(dec_layers_to_prune, original_dec_layers - 1) if original_dec_layers > 1 else 0
+
+    print(f"Targeting removal of {enc_layers_to_prune} encoder layers.")
+    print(f"Targeting removal of {dec_layers_to_prune} decoder layers.")
+
+    # --- Encoder Pruning ---
+    new_encoder_layers = []
+    if original_enc_layers > 0:
+        new_encoder_layers = encoder.layers # Default to existing list
+        if enc_layers_to_prune > 0:
+            # Randomly sample indices to KEEP
+            enc_indices_to_keep = sorted(random.sample(range(original_enc_layers),
+                                                    original_enc_layers - enc_layers_to_prune))
+            print(f"Keeping encoder layers at original indices: {enc_indices_to_keep}")
+            # Create a new ModuleList with only the kept layers
+            new_encoder_layers = nn.ModuleList([encoder.layers[i] for i in enc_indices_to_keep])
+            encoder.layers = new_encoder_layers # Modify encoder within nested_model
+    else:
+        print("Skipping encoder pruning (0 layers or 0 prune count).")
+
+    # Store actual final encoder layer count on the TOP-LEVEL model object
+    pruned_model.num_encoder_layers = len(new_encoder_layers)
+
+    # --- Decoder Pruning ---
+    new_decoder_layers = []
+    dec_indices_to_keep = list(range(original_dec_layers)) # Default to all indices before pruning
+    if original_dec_layers > 0:
+        new_decoder_layers = decoder.layers # Default to existing list
+        if dec_layers_to_prune > 0:
+            # Randomly sample indices to KEEP
+            dec_indices_to_keep = sorted(random.sample(range(original_dec_layers),
+                                                    original_dec_layers - dec_layers_to_prune))
+            print(f"Keeping decoder layers at original indices: {dec_indices_to_keep}")
+            # Create a new ModuleList with only the kept layers
+            new_decoder_layers = nn.ModuleList([decoder.layers[i] for i in dec_indices_to_keep])
+            decoder.layers = new_decoder_layers # Modify decoder within nested_model
+    else:
+        print("Skipping decoder pruning (0 layers or 0 prune count).")
+
+    # Update decoder's internal layer count attribute if it exists
+    if hasattr(decoder, 'num_layers'):
+        decoder.num_layers = len(new_decoder_layers)
+    # Store actual final decoder layer count on the TOP-LEVEL model object
+    pruned_model.num_decoder_layers = len(new_decoder_layers)
+
+    # --- Prediction Head Pruning and Re-indexing ---
+    # Identify whether prediction heads are on the top-level model (Deformable DETR) or on the decoder (RT-DETR)
+    target_for_heads = pruned_model
+    if not hasattr(target_for_heads, 'class_embed') and hasattr(decoder, 'class_embed'):
+        target_for_heads = decoder
+
+    has_class_embed = hasattr(target_for_heads, 'class_embed') and target_for_heads.class_embed is not None
+    has_bbox_embed = hasattr(target_for_heads, 'bbox_embed') and target_for_heads.bbox_embed is not None
+
+    is_multi_head_class = has_class_embed and isinstance(target_for_heads.class_embed, nn.ModuleList) and len(target_for_heads.class_embed) > 1
+    is_multi_head_bbox = has_bbox_embed and isinstance(target_for_heads.bbox_embed, nn.ModuleList) and len(target_for_heads.bbox_embed) > 1
+
+    if is_multi_head_class or is_multi_head_bbox:
+        print("\nRebuilding prediction heads ModuleList for pruned decoder...")
+
+        if is_multi_head_class:
+            original_class_embed_list = target_for_heads.class_embed
+            num_original_heads = len(original_class_embed_list)
+            print(f"  Processing {num_original_heads} original class prediction heads.")
+            
+            new_class_embed_list = nn.ModuleList()
+            for i, original_idx in enumerate(dec_indices_to_keep):
+                if i == len(dec_indices_to_keep) - 1:
+                    # The last layer in the pruned decoder gets the original final head
+                    final_head_idx = num_original_heads - 1
+                    new_class_embed_list.append(original_class_embed_list[final_head_idx])
+                    print(f"  Mapping pruned decoder layer {i} (original {original_idx}) to final prediction head {final_head_idx}.")
+                else:
+                    # Intermediate layers get their corresponding original heads
+                    new_class_embed_list.append(original_class_embed_list[original_idx])
+                    print(f"  Mapping pruned decoder layer {i} (original {original_idx}) to prediction head {original_idx}.")
+
+            target_for_heads.class_embed = new_class_embed_list
+            print(f"  Finished class heads. New count: {len(new_class_embed_list)}")
+
+        elif has_class_embed:
+             print("  Original class embed is single layer. Keeping it as is.")
+
+        if is_multi_head_bbox:
+            original_bbox_embed_list = target_for_heads.bbox_embed
+            num_original_heads = len(original_bbox_embed_list)
+            print(f"  Processing {num_original_heads} original bbox prediction heads.")
+            
+            new_bbox_embed_list = nn.ModuleList()
+            for i, original_idx in enumerate(dec_indices_to_keep):
+                if i == len(dec_indices_to_keep) - 1:
+                    # The last layer in the pruned decoder gets the original final head
+                    final_head_idx = num_original_heads - 1
+                    new_bbox_embed_list.append(original_bbox_embed_list[final_head_idx])
+                    print(f"  Mapping pruned decoder layer {i} (original {original_idx}) to final prediction head {final_head_idx}.")
+                else:
+                    # Intermediate layers get their corresponding original heads
+                    new_bbox_embed_list.append(original_bbox_embed_list[original_idx])
+                    print(f"  Mapping pruned decoder layer {i} (original {original_idx}) to prediction head {original_idx}.")
+
+            target_for_heads.bbox_embed = new_bbox_embed_list
+            print(f"  Finished bbox heads. New count: {len(new_bbox_embed_list)}")
+
+        elif has_bbox_embed:
+             print("  Original bbox embed is single layer/module. Keeping it as is.")
+
+    elif has_class_embed:
+         print("\nModel appears to have only a single final prediction head. No head pruning/re-indexing needed.")
+    else:
+         print("\nWarning: Model does not appear to have 'class_embed'. Skipping head processing.")
+
+    print("--- Pruning Finished ---")
+    print(f"Final layer counts: Encoder={pruned_model.num_encoder_layers}, Decoder={pruned_model.num_decoder_layers}")
+    if hasattr(target_for_heads, 'class_embed') and target_for_heads.class_embed is not None:
+        is_list = isinstance(target_for_heads.class_embed, nn.ModuleList)
+        head_len = len(target_for_heads.class_embed) if is_list else 1
+        print(f"Final class_embed: {'ModuleList' if is_list else 'Single Module'}, Length/Count: {head_len}")
+    if hasattr(target_for_heads, 'bbox_embed') and target_for_heads.bbox_embed is not None:
+        is_list = isinstance(target_for_heads.bbox_embed, nn.ModuleList)
+        head_len = len(target_for_heads.bbox_embed) if is_list else 1
+        print(f"Final bbox_embed: {'ModuleList' if is_list else 'Single Module'}, Length/Count: {head_len}")
+
+    # Ensure the model configuration reflects the pruned layer counts (important for saving/reloading)
+    if hasattr(pruned_model, 'config'):
+        print("Updating model config with new layer counts...")
+        pruned_model.config.encoder_layers = pruned_model.num_encoder_layers
+        pruned_model.config.decoder_layers = pruned_model.num_decoder_layers
+    else:
+        print("Warning: Pruned model does not have a 'config' attribute to update layer counts.")
+
+    return pruned_model
+
+def load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=None, modification='prune-structured', structured=None):
     """
     Main entry point for loading and pruning RT-DETR models.
     
@@ -297,15 +480,32 @@ def load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_locatio
         pruning_params (list or float): Pruning rates specification.
         criterion (int): Importance evaluation criterion index.
         map_location (torch.device): Target load device.
-        structured (bool): Perform structured pruning if True, otherwise unstructured.
+        modification (str): 'prune-structured' | 'prune-unstructured' | 'prune-layer'.
+        structured (bool, optional): Legacy parameter to override modification.
         
     Returns:
         model (nn.Module): Loaded and pruned model.
     """
+    if structured is not None:
+        modification = 'prune-structured' if structured else 'prune-unstructured'
+        
     model, image_processor, config = attempt_load_rtdetr(weights_dir, map_location)
     model = replace_frozen_bn(model)
     
-    if structured:
+    if modification == 'prune-layer':
+        prune_ratio = 0.2  # default fallback
+        if isinstance(pruning_params, float):
+            prune_ratio = pruning_params
+        elif isinstance(pruning_params, list) and len(pruning_params) > 0:
+            if isinstance(pruning_params[0], (int, float)):
+                prune_ratio = float(pruning_params[0])
+            elif isinstance(pruning_params[0], (list, tuple)) and len(pruning_params[0]) > 1:
+                prune_ratio = float(pruning_params[0][1])
+        print(f"Applying layer pruning with ratio: {prune_ratio}")
+        model = prune_layers_rtdetr(model, prune_ratio)
+    elif modification == 'prune-unstructured':
+        model = prune_unstructured(model, pruning_params, criterion)
+    else:
         model = prune_structured_global(model, pruning_params, criterion)
         # Verify shape consistency after structured pruning via forward pass
         print("Verifying model forward pass shape consistency...")
@@ -316,8 +516,6 @@ def load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_locatio
             print("Forward pass verification successful.")
         except Exception as e:
             print(f"WARNING: Model forward pass failed after structured pruning: {e}")
-    else:
-        model = prune_unstructured(model, pruning_params, criterion)
         
     model.eval()
     return model
@@ -331,7 +529,7 @@ if __name__ == '__main__':
     parser.add_argument('--output-path', type=str, default='rtdetr-pruned.pt', help='output path for pruned model')
     parser.add_argument('--pruning-params', type=str, default='', help='Pruning parameters as string')
     parser.add_argument('--criterion', type=int, default=0, help='Pruning criterion (0=L2, etc.)')
-    parser.add_argument('--modification', type=str, default='prune-structured', help='prune-structured or prune-unstructured')
+    parser.add_argument('--modification', type=str, default='prune-structured', help='prune-structured | prune-unstructured | prune-layer')
     
     opt = parser.parse_args()
     
@@ -358,15 +556,13 @@ if __name__ == '__main__':
             print(f"Error parsing pruning params: {e}")
             raise e
             
-    structured = (opt.modification == 'prune-structured')
-    
     print(f"Pruning model with parameters: {pruning_params_parsed}")
     model = load_pruned_model_rtdetr(
         weights_dir=opt.weights,
         pruning_params=pruning_params_parsed,
         criterion=opt.criterion,
         map_location=device,
-        structured=structured
+        modification=opt.modification
     )
     
     # Save the model

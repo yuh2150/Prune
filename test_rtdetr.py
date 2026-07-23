@@ -72,15 +72,18 @@ def test(data,
             model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, structured=False)
         elif modification == "prune-structured":
             model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, structured=True)
+        elif modification == "prune-layer":
+            model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, modification="prune-layer")
         else:
             model, _, _ = attempt_load_rtdetr(weights_dir, device)
     else:
         # If model is already loaded, we still prune it if modification and pruning_params are supplied
         if pruning_params:
-            from prune_rtdetr import prune_unstructured, prune_structured_global
             if modification == "prune-unstructured":
+                from prune_rtdetr import prune_unstructured
                 model = prune_unstructured(model, pruning_params, criterion)
             elif modification == "prune-structured":
+                from prune_rtdetr import prune_structured_global
                 model = prune_structured_global(model, pruning_params, criterion)
                 # Verify shape consistency
                 print("Verifying model forward pass shape consistency...")
@@ -91,6 +94,17 @@ def test(data,
                     print("Forward pass verification successful.")
                 except Exception as e:
                     print(f"WARNING: Model forward pass failed after structured pruning: {e}")
+            elif modification == "prune-layer":
+                from prune_rtdetr import prune_layers_rtdetr
+                prune_ratio = 0.2
+                if isinstance(pruning_params, float):
+                    prune_ratio = pruning_params
+                elif isinstance(pruning_params, list) and len(pruning_params) > 0:
+                    if isinstance(pruning_params[0], (int, float)):
+                        prune_ratio = float(pruning_params[0])
+                    elif isinstance(pruning_params[0], (list, tuple)) and len(pruning_params[0]) > 1:
+                        prune_ratio = float(pruning_params[0][1])
+                model = prune_layers_rtdetr(model, prune_ratio)
             
     # Load image processor and config
     hf_dir = 'PekingU/rtdetr_r18vd' if (isinstance(weights_dir, str) and (weights_dir.endswith('.pt') or weights_dir.endswith('.pth'))) else weights_dir
@@ -290,7 +304,7 @@ if __name__ == '__main__':
     parser.add_argument('--v5-metric', action='store_true', help='assume maximum recall as 1.0 in AP calculation')
     
     # Flags for pruning
-    parser.add_argument('--modification', default='', help='prune-structured, prune-unstructured')
+    parser.add_argument('--modification', default='', help='prune-structured, prune-unstructured, prune-layer')
     parser.add_argument('--prune-output', type=str, default='output.txt', help="file to write results of pruning to")
     parser.add_argument('--pruning-params', type=str, default='',
                         help='Pruning parameters can be defined as "[(l_1, p_1), (l_2, p_2), (l_3, p_3), ..., (l_n, p_n)]"')
@@ -341,9 +355,6 @@ if __name__ == '__main__':
         from prune_rtdetr import replace_frozen_bn
         base_model, _, _ = attempt_load_rtdetr(opt.weights[0], device)
         base_model = replace_frozen_bn(base_model)
-        prunable_layers = get_prunable_layers(base_model)
-        conv_layers = len(prunable_layers)
-        print(f"Snapshotting prunable Conv2d layers. Found {conv_layers} prunable layers.")
         
         # Create dataset & dataloader once to reuse across iterations
         import yaml
@@ -374,12 +385,48 @@ if __name__ == '__main__':
         dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False, num_workers=0, collate_fn=eval_collate_fn)
             
         rate_list = [opt.pruning_rate] if not isinstance(opt.pruning_rate, list) else opt.pruning_rate
-        for rate in rate_list:
-            prune_output = os.path.join(folder, opt.prune_output.replace('.txt', '_' + str(int(100 * rate)) + '.txt'))
-            with open(prune_output, "w") as f:
-                print("[", file=f)
-            for i in range(conv_layers):
-                print(f"\n--- Pruning sensitivity analysis: Layer {i+1}/{conv_layers} with rate {rate} ---")
+        
+        if opt.modification == 'prune-layer':
+            print("\n--- Running Layer Pruning (Depth) Sensitivity Analysis ---")
+            print(f"Rates to evaluate: {rate_list}")
+            
+            # Evaluate baseline first for reference
+            print("\nEvaluating Baseline Model...")
+            baseline_copy = deepcopy(base_model)
+            r_base = test(opt.data,
+                          opt.weights,
+                          opt.batch_size,
+                          opt.img_size,
+                          opt.conf_thres,
+                          opt.iou_thres,
+                          False,
+                          opt.single_cls,
+                          opt.augment,
+                          opt.verbose,
+                          model=baseline_copy,
+                          dataloader=dataloader,
+                          pruning_params=[],
+                          plots=False,
+                          img_dir=opt.img_dir,
+                          ann_file=opt.ann_file,
+                          modification=''
+                          )
+            (mp_b, mr_b, map50_b, map_b, _, _, _), _, _, params_b, fs_b = r_base
+            print(f"Baseline: mAP={map_b:.4f}, mAP50={map50_b:.4f}, Params={params_b:,}, GFLOPs={fs_b}")
+            
+            results = []
+            results.append({
+                'Ratio': 'Baseline',
+                'Params': f"{params_b:,}",
+                'Param Reduc %': '0.00',
+                'GFLOPs': f"{fs_b:.2f}",
+                'GFLOP Reduc %': '0.00',
+                'mAP': f"{map_b:.4f}",
+                'mAP50': f"{map50_b:.4f}"
+            })
+            
+            for rate in rate_list:
+                print(f"\n--- Evaluating Pruning Ratio: {rate} ---")
                 model_copy = deepcopy(base_model)
                 r = test(opt.data,
                          opt.weights,
@@ -393,15 +440,70 @@ if __name__ == '__main__':
                          opt.verbose,
                          model=model_copy,
                          dataloader=dataloader,
-                         pruning_params=[(i, rate)],
+                         pruning_params=rate,
                          plots=False,
                          img_dir=opt.img_dir,
                          ann_file=opt.ann_file,
-                         modification=opt.modification
+                         modification='prune-layer'
                          )
-                (mp, mr, map50, map, _, _, _, ), maps, t, params, fs = r
+                (mp, mr, map50, map_val, _, _, _), _, _, params, fs = r
+                
+                param_reduc = (1.0 - params / params_b) * 100 if params_b > 0 else 0.0
+                gflop_reduc = (1.0 - fs / fs_b) * 100 if fs_b > 0 else 0.0
+                
+                print(f"Ratio {rate}: mAP={map_val:.4f}, mAP50={map50:.4f}, Params={params:,} (Reduc {param_reduc:.2f}%), GFLOPs={fs} (Reduc {gflop_reduc:.2f}%)")
+                
+                results.append({
+                    'Ratio': f"{rate:.2f}" if isinstance(rate, float) else str(rate),
+                    'Params': f"{params:,}",
+                    'Param Reduc %': f"{param_reduc:.2f}",
+                    'GFLOPs': f"{fs:.2f}",
+                    'GFLOP Reduc %': f"{gflop_reduc:.2f}",
+                    'mAP': f"{map_val:.4f}",
+                    'mAP50': f"{map50:.4f}"
+                })
+                
+            # Create DataFrame and save
+            import pandas as pd
+            df = pd.DataFrame(results)
+            csv_path = os.path.join(folder, 'pruning_results_summary.csv')
+            df.to_csv(csv_path, index=False)
+            print(f"\nSummary table saved to {csv_path}")
+            print(df.to_string(index=False))
+            
+        else:
+            prunable_layers = get_prunable_layers(base_model)
+            conv_layers = len(prunable_layers)
+            print(f"Snapshotting prunable Conv2d layers. Found {conv_layers} prunable layers.")
+            
+            for rate in rate_list:
+                prune_output = os.path.join(folder, opt.prune_output.replace('.txt', '_' + str(int(100 * rate)) + '.txt'))
+                with open(prune_output, "w") as f:
+                    print("[", file=f)
+                for i in range(conv_layers):
+                    print(f"\n--- Pruning sensitivity analysis: Layer {i+1}/{conv_layers} with rate {rate} ---")
+                    model_copy = deepcopy(base_model)
+                    r = test(opt.data,
+                             opt.weights,
+                             opt.batch_size,
+                             opt.img_size,
+                             opt.conf_thres,
+                             opt.iou_thres,
+                             False,
+                             opt.single_cls,
+                             opt.augment,
+                             opt.verbose,
+                             model=model_copy,
+                             dataloader=dataloader,
+                             pruning_params=[(i, rate)],
+                             plots=False,
+                             img_dir=opt.img_dir,
+                             ann_file=opt.ann_file,
+                             modification=opt.modification
+                             )
+                    (mp, mr, map50, map, _, _, _, ), maps, t, params, fs = r
+                    with open(prune_output, "a") as f:
+                        print(f"({i}, ({mp}, {mr}, {map50}, {map}, {list(maps)}, {t}, {params}, {fs})),", file=f)
                 with open(prune_output, "a") as f:
-                    print(f"({i}, ({mp}, {mr}, {map50}, {map}, {list(maps)}, {t}, {params}, {fs})),", file=f)
-            with open(prune_output, "a") as f:
-                print("]", file=f)
-            print(f"Sensitivity analysis for pruning rate {rate} saved to {prune_output}")
+                    print("]", file=f)
+                print(f"Sensitivity analysis for pruning rate {rate} saved to {prune_output}")

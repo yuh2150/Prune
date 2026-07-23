@@ -20,9 +20,11 @@ def main():
     print(f"Running benchmark on device: {device}")
     
     models = {
-        'Baseline': 'weights/yolov5s.pt',
-        'Pruned': 'weights/yolov5s-pruned.pt',
-        'Fine-tuned-50epochs': 'weights/yolov5s-pruned-finetuned.pt'
+        # 'Baseline': 'weights/yolov5s.pt',
+        # 'Pruned': 'weights/yolov5s-pruned.pt',
+        # 'Fine-tuned-50epochs': 'weights/yolov5s-pruned-finetuned.pt'
+        'Layer Pruned': 'weights/yolov5s-layer-pruned.pt',
+        'Layer Pruned Fine-tuned': 'weights/yolov5s-layer-pruned-finetuned.pt'
     }
     
     results_list = []
@@ -98,7 +100,7 @@ def main():
     print(f"\nSaved CSV report to: {os.path.abspath(csv_file)}")
     
     # Export to XLSX
-    xlsx_file = 'benchmarks/benchmark_results.xlsx'
+    xlsx_file = 'benchmarks/benchmark_layer_results.xlsx'
     try:
         df.to_excel(xlsx_file, index=False)
         print(f"Saved Excel report to: {os.path.abspath(xlsx_file)}")

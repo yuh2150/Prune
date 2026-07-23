@@ -60,6 +60,48 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
     opt.data = check_file(opt.data)
+    
+    # Check if the weight points to RT-DETR
+    weight_str = opt.weights[0] if isinstance(opt.weights, list) and len(opt.weights) > 0 else str(opt.weights)
+    if 'rtdetr' in str(weight_str).lower():
+        print("Detected RT-DETR weights. Redirecting to test_rtdetr.py sensitivity analysis...")
+        import sys
+        import subprocess
+        
+        # Build command to execute test_rtdetr.py
+        cmd = [sys.executable, 'test_rtdetr.py', '--task', 'pruning_sensitivity_analysis']
+        # Forward relevant args
+        cmd.extend(['--weights', weight_str])
+        cmd.extend(['--data', opt.data])
+        cmd.extend(['--batch-size', str(opt.batch_size)])
+        cmd.extend(['--img-size', str(opt.img_size)])
+        cmd.extend(['--conf-thres', str(opt.conf_thres)])
+        cmd.extend(['--iou-thres', str(opt.iou_thres)])
+        cmd.extend(['--device', str(opt.device)])
+        if opt.single_cls:
+            cmd.append('--single-cls')
+        if opt.augment:
+            cmd.append('--augment')
+        if opt.verbose:
+            cmd.append('--verbose')
+        cmd.extend(['--modification', opt.modification])
+        cmd.extend(['--prune-output', opt.prune_output])
+        cmd.extend(['--pruning-params', opt.pruning_params])
+        cmd.extend(['--criterion', str(opt.criterion)])
+        cmd.extend(['--pruning-rate', str(opt.pruning_rate)])
+        cmd.extend(['--project', opt.project])
+        cmd.extend(['--name', opt.name])
+        if opt.exist_ok:
+            cmd.append('--exist-ok')
+            
+        print(f"Running command: {' '.join(cmd)}")
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing test_rtdetr.py: {e}")
+            sys.exit(e.returncode)
+        sys.exit(0)
+
     opt.pruning_rate = ast.literal_eval(opt.pruning_rate)
     
     pruning_params_parsed = []
