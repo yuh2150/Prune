@@ -1,4 +1,5 @@
 import os
+import torch
 import pandas as pd
 from pathlib import Path
 from evaluation.core import evaluate
@@ -12,32 +13,37 @@ class DummyOptions:
         self.modification = modification
 
 def main():
-    # Options
     data_path = 'data/coco1000.yaml'
-    # Use GPU if available, else CPU
-    import torch
     device = '0' if torch.cuda.is_available() else 'cpu'
     print(f"Running benchmark on device: {device}")
     
+    # Models to benchmark
     models = {
-        # 'Baseline': 'weights/yolov5s.pt',
-        # 'Pruned': 'weights/yolov5s-pruned.pt',
-        # 'Fine-tuned-50epochs': 'weights/yolov5s-pruned-finetuned.pt'
-        'Layer Pruned': 'weights/yolov5s-layer-pruned.pt',
-        'Layer Pruned Fine-tuned': 'weights/yolov5s-layer-pruned-finetuned.pt'
+        'Baseline (YOLOv5s)': 'weights/yolov5s.pt',
+        # 'Channel Pruned': 'weights/yolov5s-pruned.pt',
+        # 'Channel Pruned Fine-tuned': 'weights/yolov5s-pruned-finetuned.pt',
+        # 'Layer Pruned': 'weights/yolov5s-layer-pruned.pt',
+        # 'Layer Pruned Fine-tuned': 'weights/yolov5s-layer-pruned-finetuned.pt',
+        'Taylor Expansion Pruned': 'weights/yolov5s-taylor-pruned.pt'
     }
     
     results_list = []
-    
+    baseline_params = None
+    baseline_flops = None
+    baseline_latency = None
+
     for name, weights in models.items():
+        if not os.path.exists(weights):
+            print(f"Skipping {name} (File not found: {weights})")
+            continue
+
         print(f"\n=========================================")
         print(f"Evaluating {name} Model: {weights}")
         print(f"=========================================")
         
-        opt = DummyOptions(device=device, project='runs/test', name=f'bench_{name.lower()}', exist_ok=True)
+        opt = DummyOptions(device=device, project='runs/test', name=f'bench_{name.lower().replace(" ", "_")}', exist_ok=True)
         
         try:
-            # We run evaluation under standard test config (conf_thres=0.001, iou_thres=0.6)
             results, maps, speed, params, flops = evaluate(
                 data=data_path,
                 weights=weights,
@@ -50,24 +56,34 @@ def main():
                 opt=opt
             )
             
-            # results: (mp, mr, map50, map, box_loss, obj_loss, cls_loss)
             mp, mr, map50, map_coco = results[0], results[1], results[2], results[3]
-            # speed: (inference_ms, nms_ms, total_ms, imgsz, imgsz, batch_size)
             inf_speed, nms_speed, total_speed = speed[0], speed[1], speed[2]
             
+            if 'Baseline' in name or baseline_params is None:
+                baseline_params = params
+                baseline_flops = flops
+                baseline_latency = total_speed
+
+            param_red = ((baseline_params - params) / baseline_params * 100) if baseline_params else 0.0
+            flops_red = ((baseline_flops - flops) / baseline_flops * 100) if baseline_flops else 0.0
+            speedup = ((baseline_latency - total_speed) / baseline_latency * 100) if baseline_latency else 0.0
+
             results_list.append({
                 'Model Name': name,
                 'Weight File': weights,
                 'Parameters': params,
-                'GFLOPs': flops,
+                'Param Reduction (%)': round(param_red, 2),
+                'GFLOPs': round(flops, 3),
+                'FLOPs Reduction (%)': round(flops_red, 2),
                 'Precision (P)': round(mp, 4),
                 'Recall (R)': round(mr, 4),
                 'mAP@0.5': round(map50, 4),
                 'mAP@0.5:0.95': round(map_coco, 4),
-                'Inference Speed (ms/img)': round(inf_speed, 2),
-                'NMS Speed (ms/img)': round(nms_speed, 2),
-                'Total Latency (ms/img)': round(total_speed, 2),
-                'FPS': round(1000 / total_speed, 1) if total_speed > 0 else 0.0
+                'Inference Speed (ms)': round(inf_speed, 2),
+                'NMS Speed (ms)': round(nms_speed, 2),
+                'Total Latency (ms)': round(total_speed, 2),
+                'FPS': round(1000 / total_speed, 1) if total_speed > 0 else 0.0,
+                'Speedup (%)': round(speedup, 2)
             })
             
         except Exception as e:
@@ -78,34 +94,20 @@ def main():
         return
         
     df = pd.DataFrame(results_list)
+    os.makedirs("benchmarks", exist_ok=True)
     
-    # Calculate percentage reduction for params and flops, and speedup for latency
-    if len(df) == 2:
-        # Add a difference row or columns
-        print("\n--- Summary of Comparison ---")
-        base_row = df.iloc[0]
-        pruned_row = df.iloc[1]
-        
-        param_reduction = (base_row['Parameters'] - pruned_row['Parameters']) / base_row['Parameters'] * 100
-        flops_reduction = (base_row['GFLOPs'] - pruned_row['GFLOPs']) / base_row['GFLOPs'] * 100
-        speedup = (base_row['Total Latency (ms/img)'] - pruned_row['Total Latency (ms/img)']) / base_row['Total Latency (ms/img)'] * 100
-        
-        print(f"Parameters reduced by: {param_reduction:.2f}%")
-        print(f"GFLOPs reduced by:     {flops_reduction:.2f}%")
-        print(f"Latency reduced by:    {speedup:.2f}%")
-
     # Export to CSV
-    csv_file = 'benchmarks/benchmark_results.csv'
+    csv_file = 'benchmarks/taylor_benchmark_results.csv'
     df.to_csv(csv_file, index=False)
-    print(f"\nSaved CSV report to: {os.path.abspath(csv_file)}")
+    print(f"\n[Benchmark] Saved CSV report to: {os.path.abspath(csv_file)}")
     
     # Export to XLSX
-    xlsx_file = 'benchmarks/benchmark_layer_results.xlsx'
+    xlsx_file = 'benchmarks/taylor_benchmark_results.xlsx'
     try:
         df.to_excel(xlsx_file, index=False)
-        print(f"Saved Excel report to: {os.path.abspath(xlsx_file)}")
+        print(f"[Benchmark] Saved Excel report to: {os.path.abspath(xlsx_file)}")
     except Exception as e:
-        print(f"Could not save Excel file (pandas xlsx engine missing?): {e}")
+        print(f"[Benchmark] Warning exporting Excel: {e}")
 
 if __name__ == '__main__':
     main()
