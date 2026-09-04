@@ -1,0 +1,11 @@
+Model Name,Precision (P),Recall (R),mAP@0.5,mAP@0.5:0.95
+Baseline YOLOv5s,0.6628,0.5503,0.5904,0.3858
+YOLOv5s Unstructured Pruned 10%,0.6437,0.5567,0.5907,0.3835
+YOLOv5s Unstructured Pruned 30%,0.6574,0.4992,0.5464,0.3433
+YOLOv5s Unstructured Pruned 50%,0.4097,0.1892,0.1878,0.0988
+YOLOv5s Unstructured Pruned 70%,0.003,0.0029,0.0001,0
+Baseline RT-DETR,0.6496,0.6864,0.6496,0.4744
+RT-DETR Unstructured Pruned 10%,0.6505,0.6865,0.6505,0.4742
+RT-DETR Unstructured Pruned 30%,0.6432,0.6842,0.6432,0.473
+RT-DETR Unstructured Pruned 50%,0.5493,0.6407,0.5493,0.408
+RT-DETR Unstructured Pruned 70%,0.0165,0.0494,0.0165,0.0093

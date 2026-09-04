@@ -55,7 +55,18 @@ except ImportError:
     def check_wandb_resume(opt):
         return None
 
-from prune import prune_structured
+def prune_structured(model, pruning_params, criterion_id=0, tiny=False):
+    from prune_framework.core.registry import PluginRegistry
+    from prune_framework.plugins.adapters.yolov5 import YOLOv5Adapter
+    from prune_framework.plugins.pruners.structured import StructuredPruner
+    adapter = YOLOv5Adapter(model)
+    pruner = StructuredPruner()
+    criterion_name = "l2" if criterion_id in [0, 1] else "l1"
+    criterion_cls = PluginRegistry.get_criterion(criterion_name)
+    criterion = criterion_cls()
+    config = {"pruning_params": pruning_params}
+    return pruner.prune(adapter, criterion, config=config)
+
 logger = logging.getLogger(__name__)
 
 

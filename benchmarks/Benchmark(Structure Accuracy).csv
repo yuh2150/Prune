@@ -1,0 +1,8 @@
+Models,Precision (P),Recall (R),mAP@0.5,mAP@0.5:0.95
+YOLOV5s - Baseline,0.6628,0.5503,0.5904,0.3858
+YOLOV5s - Filter Pruned,0.5927,0.4103,0.4314,0.2517
+YOLOV5s - Filter Pruned Fine-tuned,0.6359,0.4263,0.466,0.2884
+YOLOV5s - Layer Pruned,0.2052,0.0338,0.0096,0.0038
+YOLOV5s - Layer Pruned Fine-tuned,0.5635,0.4068,0.4347,0.2549
+RT-DETR-R18 - Baseline,0.6516,0.6938,0.6516,0.4844
+RT-DETR-R18 - Pruned,0.3782,0.4998,0.3782,0.2665

@@ -1,0 +1,8 @@
+Model Class,Model Name,Weight File,Parameters,GFLOPs,Precision,Recall,mAP@0.5,mAP@0.5:0.95,Latency (ms),FPS
+YOLOv5s,YOLOv5s Baseline,weights/yolov5s.pt,7225885,16.436,0.6636,0.5506,0.5907,0.3865,181.08,5.5
+YOLOv5s,YOLOv5s Unstructured 30%,weights/yolov5s-unstructured-pruned-30.pt,7225885,16.436,0.6589,0.5002,0.5468,0.3438,250.89,4.0
+RT-DETR,RT-DETR Baseline,PekingU/rtdetr_r18vd,20174608,61.243,0.6496,0.6864,0.6496,0.4744,1173.25,0.9
+RT-DETR,RT-DETR Unstructured 10%,weights/rtdetr-unstructured-pruned-10.pt,20184464,61.471,0.6505,0.6865,0.6505,0.4742,487.29,2.1
+RT-DETR,RT-DETR Unstructured 30%,weights/rtdetr-unstructured-pruned-30.pt,20184464,61.471,0.6432,0.6842,0.6432,0.473,1330.53,0.8
+RT-DETR,RT-DETR Unstructured 50%,weights/rtdetr-unstructured-pruned-50.pt,20184464,61.471,0.5493,0.6407,0.5493,0.408,1377.95,0.7
+RT-DETR,RT-DETR Unstructured 70%,weights/rtdetr-unstructured-pruned-70.pt,20184464,61.471,0.0165,0.0494,0.0165,0.0093,1412.39,0.7

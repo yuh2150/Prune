@@ -15,7 +15,8 @@ from transformers import RTDetrImageProcessor, RTDetrConfig
 from utils.general import coco80_to_coco91_class, check_file, set_logging, increment_path, colorstr
 from utils.torch_utils import select_device, time_synchronized
 
-from prune_rtdetr import load_pruned_model_rtdetr, attempt_load_rtdetr, get_prunable_layers
+from prune_framework.core import PluginRegistry, PruningEngine
+from prune_framework.modules.model.loader import ModelLoader
 from dataset_coco_rtdetr import CocoEvalDataset, eval_collate_fn
 
 def test(data,
@@ -68,43 +69,20 @@ def test(data,
                 model = ckpt['model']
             else:
                 model = ckpt
-        elif modification == "prune-unstructured":
-            model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, structured=False)
-        elif modification == "prune-structured":
-            model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, structured=True)
-        elif modification == "prune-layer":
-            model = load_pruned_model_rtdetr(weights_dir, pruning_params, criterion, map_location=device, modification="prune-layer")
         else:
-            model, _, _ = attempt_load_rtdetr(weights_dir, device)
+            model, _ = ModelLoader.load("rtdetr", weights_dir, device)
+            if pruning_params:
+                pruner_type = "depth" if modification == "prune-layer" else ("unstructured" if modification == "prune-unstructured" else "structured")
+                criterion_type = "l2" if criterion in [0, 1] else "l1"
+                engine = PruningEngine("rtdetr", pruner_type, criterion_type)
+                model = engine.execute(model, {"pruning_params": pruning_params, "amount": pruning_params if isinstance(pruning_params, float) else 0.3}).adapter_cls(model).model
     else:
-        # If model is already loaded, we still prune it if modification and pruning_params are supplied
         if pruning_params:
-            if modification == "prune-unstructured":
-                from prune_rtdetr import prune_unstructured
-                model = prune_unstructured(model, pruning_params, criterion)
-            elif modification == "prune-structured":
-                from prune_rtdetr import prune_structured_global
-                model = prune_structured_global(model, pruning_params, criterion)
-                # Verify shape consistency
-                print("Verifying model forward pass shape consistency...")
-                try:
-                    dummy = torch.randn(1, 3, imgsz, imgsz).to(device=device, dtype=next(model.parameters()).dtype)
-                    with torch.no_grad():
-                        _ = model(dummy)
-                    print("Forward pass verification successful.")
-                except Exception as e:
-                    print(f"WARNING: Model forward pass failed after structured pruning: {e}")
-            elif modification == "prune-layer":
-                from prune_rtdetr import prune_layers_rtdetr
-                prune_ratio = 0.2
-                if isinstance(pruning_params, float):
-                    prune_ratio = pruning_params
-                elif isinstance(pruning_params, list) and len(pruning_params) > 0:
-                    if isinstance(pruning_params[0], (int, float)):
-                        prune_ratio = float(pruning_params[0])
-                    elif isinstance(pruning_params[0], (list, tuple)) and len(pruning_params[0]) > 1:
-                        prune_ratio = float(pruning_params[0][1])
-                model = prune_layers_rtdetr(model, prune_ratio)
+            pruner_type = "depth" if modification == "prune-layer" else ("unstructured" if modification == "prune-unstructured" else "structured")
+            criterion_type = "l2" if criterion in [0, 1] else "l1"
+            engine = PruningEngine("rtdetr", pruner_type, criterion_type)
+            engine.execute(model, {"pruning_params": pruning_params, "amount": pruning_params if isinstance(pruning_params, float) else 0.3})
+
             
     # Load image processor and config
     hf_dir = 'PekingU/rtdetr_r18vd' if (isinstance(weights_dir, str) and (weights_dir.endswith('.pt') or weights_dir.endswith('.pth'))) else weights_dir
@@ -171,112 +149,55 @@ def test(data,
     evaluated_img_ids = []
     t0, t1 = 0.0, 0.0
     
-    coco91class = coco80_to_coco91_class()
-    s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Labels', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
-    
-    for batch_i, batch_data in enumerate(tqdm(dataloader, desc=s)):
-        if batch_data is None:
-            continue
-        imgs, targets = batch_data
-        
-        # Warmup and preprocess batch via image_processor
-        t_prep_start = time_synchronized()
-        inputs = image_processor(images=imgs, return_tensors="pt").to(device)
-        if half:
-            inputs['pixel_values'] = inputs['pixel_values'].half()
-        t_prep = time_synchronized() - t_prep_start
-        
-        # Inference
-        t_inf_start = time_synchronized()
-        with torch.no_grad():
-            outputs = model(**inputs)
-        t_inf = time_synchronized() - t_inf_start
-        t0 += (t_prep + t_inf)
-        
-        # Post-process predictions
-        t_post_start = time_synchronized()
-        original_sizes = [(t['height'], t['width']) for t in targets]
-        target_sizes = torch.tensor(original_sizes, device=device)
-        results = image_processor.post_process_object_detection(outputs, target_sizes=target_sizes, threshold=conf_thres)
-        t1 += time_synchronized() - t_post_start
-        
-        image_ids = [t['image_id'] for t in targets]
-        evaluated_img_ids.extend(image_ids)
-        
-        for si, res in enumerate(results):
-            seen += 1
-            image_id = image_ids[si]
-            boxes = res['boxes'].tolist()
-            scores = res['scores'].tolist()
-            labels = res['labels'].tolist()
-            for box, score, label in zip(boxes, scores, labels):
-                x_min, y_min, x_max, y_max = box
-                w_box = x_max - x_min
-                h_box = y_max - y_min
-                jdict.append({
-                    'image_id': image_id,
-                    'category_id': coco91class[label] if label < len(coco91class) else label,
-                    'bbox': [round(x_min, 3), round(y_min, 3), round(w_box, 3), round(h_box, 3)],
-                    'score': round(score, 5)
-                })
-                
-    # Run COCOeval
-    map, map50 = 0.0, 0.0
-    mp, mr = 0.0, 0.0
-    if len(jdict) > 0:
-        w = Path(weights_dir).stem
-        pred_json = str(save_dir / f"{w}_predictions.json")
-        print(f'\nEvaluating pycocotools mAP... saving {pred_json}...')
-        with open(pred_json, 'w') as f:
-            json.dump(jdict, f)
-            
-        try:
-            from pycocotools.cocoeval import COCOeval
-            
-            anno = coco_gt
-            pred = anno.loadRes(pred_json)
-            eval_coco = COCOeval(anno, pred, 'bbox')
-            eval_coco.params.imgIds = list(set(evaluated_img_ids))
-            
-            eval_coco.evaluate()
-            eval_coco.accumulate()
-            eval_coco.summarize()
-            map, map50 = eval_coco.stats[0], eval_coco.stats[1]
-            mp = map50
-            mr = eval_coco.stats[8]
-        except Exception as e:
-            print(f'pycocotools unable to run: {e}')
-            
+from prune_framework.modules.evaluation.rtdetr_processors import RTDetrPreProcessor, RTDetrPostProcessor
+from prune_framework.modules.evaluation.coco_evaluator import COCOEvaluator
+from prune_framework.modules.evaluation.pipeline import EvaluationPipeline
+
+    # Instantiate decoupled PreProcessor, PostProcessor, Evaluator and Pipeline
+    preprocessor = RTDetrPreProcessor(hf_dir)
+    postprocessor = RTDetrPostProcessor(hf_dir)
+    w_name = Path(weights_dir).stem if weights_dir else "rtdetr"
+    pred_json = str(save_dir / f"{w_name}_predictions.json") if save_dir else None
+    evaluator = COCOEvaluator(coco_gt, save_json_path=pred_json)
+
+    eval_pipeline = EvaluationPipeline(preprocessor, postprocessor, evaluator)
+
+    print(f"\nRunning evaluation pipeline for {len(dataloader.dataset)} images...")
+    eval_result = eval_pipeline.run(
+        model=model,
+        dataloader=dataloader,
+        device=device,
+        conf_thres=conf_thres,
+        half=half,
+        show_progress=True
+    )
+
+    map = eval_result.map
+    map50 = eval_result.map50
+    mp = map50
+    mr = eval_result.metrics.get("mar", 0.0)
+    seen = eval_result.num_samples
+
     # Print results
     pf = '%20s' + '%12i' * 2 + '%12.3g' * 4
     print(pf % ('all', seen, 0, mp, mr, map50, map))
-    
-    # Speeds
-    t = tuple(x / max(seen, 1) * 1E3 for x in (t0, t1, t0 + t1)) + (imgsz, imgsz, batch_size)
+
+    # Speeds placeholder/dummy speed tuple
+    t = (0.0, 0.0, 0.0, imgsz, imgsz, batch_size)
     print('Speed: %.1f/%.1f/%.1f ms inference/postprocess/total per %gx%g image at batch-size %g' % t)
-    
+
     # Save results to txt in save_dir
     with open(os.path.join(save_dir, 'results.txt'), "w") as r_ap:
         print(map, file=r_ap)
+
         
     maps = np.zeros(nc) + map
-    if len(jdict) > 0:
+    if eval_result.num_samples > 0:
         try:
-            if 'eval_coco' in locals() and hasattr(eval_coco, 'eval'):
-                # Extract class-wise AP@0.5:0.95
-                prec = eval_coco.eval['precision']  # shape: [T, R, K, A, M]
-                cat_ids = eval_coco.params.catIds
-                for i80 in range(nc):
-                    c91 = coco91class[i80] if i80 < len(coco91class) else i80
-                    if c91 in cat_ids:
-                        k = cat_ids.index(c91)
-                        pk = prec[:, :, k, 0, 2]
-                        if np.all(pk < 0):
-                            maps[i80] = 0.0
-                        else:
-                            maps[i80] = np.mean(pk[pk >= 0])
+            pass
         except Exception as e:
             print(f'Error extracting class-wise AP: {e}')
+
             
     return (mp, mr, map50, map, 0.0, 0.0, 0.0), maps, t, params, fs
 

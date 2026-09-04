@@ -1,0 +1,26 @@
+model:
+  name: rtdetr
+  weights: PekingU/rtdetr_r18vd
+  device: cuda
+
+pruning:
+  pruner: depth
+  criterion: l2
+  granularity: layer
+  amount: 0.25
+
+analysis:
+  sensitivity: false
+  layer_selection: false
+
+benchmark:
+  enabled: true
+  runs: 30
+  warmup: 5
+
+export:
+  enabled: false
+  format: onnx
+  output_path: pruned_rtdetr.onnx
+
+output_path: pruned_rtdetr_depth

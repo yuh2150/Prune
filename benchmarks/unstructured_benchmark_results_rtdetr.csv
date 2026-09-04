@@ -1,0 +1,6 @@
+Model Name,Weight File,Parameters,GFLOPs,Precision (P),Recall (R),mAP@0.5,mAP@0.5:0.95,Inference Speed (ms/img),NMS Speed (ms/img),Total Latency (ms/img),FPS
+Baseline,PekingU/rtdetr_r18vd,20174608,61.243,0.6496,0.6864,0.6496,0.4744,1504.24,1.76,1506.0,0.7
+Unstructured Pruned 10%,weights/rtdetr-unstructured-pruned-10.pt,20184464,61.471,0.6505,0.6865,0.6505,0.4742,1425.9,1.59,1427.5,0.7
+Unstructured Pruned 30%,weights/rtdetr-unstructured-pruned-30.pt,20184464,61.471,0.6432,0.6842,0.6432,0.473,1253.08,1.53,1254.61,0.8
+Unstructured Pruned 50%,weights/rtdetr-unstructured-pruned-50.pt,20184464,61.471,0.5493,0.6407,0.5493,0.408,842.43,0.66,843.09,1.2
+Unstructured Pruned 70%,weights/rtdetr-unstructured-pruned-70.pt,20184464,61.471,0.0165,0.0494,0.0165,0.0093,767.08,0.6,767.67,1.3

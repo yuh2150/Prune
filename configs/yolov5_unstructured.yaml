@@ -1,0 +1,26 @@
+model:
+  name: yolov5
+  weights: yolov5s.pt
+  device: cuda
+
+pruning:
+  pruner: unstructured
+  criterion: magnitude
+  granularity: weight
+  amount: 0.4
+
+analysis:
+  sensitivity: false
+  layer_selection: false
+
+benchmark:
+  enabled: true
+  runs: 50
+  warmup: 10
+
+export:
+  enabled: false
+  format: onnx
+  output_path: pruned_yolov5s_unstructured.onnx
+
+output_path: pruned_yolov5s_unstructured.pt

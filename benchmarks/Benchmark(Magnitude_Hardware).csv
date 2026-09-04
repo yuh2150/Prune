@@ -1,0 +1,11 @@
+Model Name,Parameters,GFLOPs,Inference Speed (ms),NMS Speed (ms),Total Latency (ms),FPS
+Baseline YOLOv5s,7225885,16.436,304.65,8.32,312.96,3.2
+YOLOv5s Unstructured Pruned 10%,7225885,16.436,269.64,7.74,277.39,3.6
+YOLOv5s Unstructured Pruned 30%,7225885,16.436,274.75,9.63,284.39,3.5
+YOLOv5s Unstructured Pruned 50%,7225885,16.436,262.25,7.5,269.75,3.7
+YOLOv5s Unstructured Pruned 70%,7225885,16.436,236.36,2.43,238.78,4.2
+Baseline RT-DETR,20174608,61.243,1504.24,1.76,1506,0.7
+RT-DETR Unstructured Pruned 10%,20184464,61.471,1425.9,1.59,1427.5,0.7
+RT-DETR Unstructured Pruned 30%,20184464,61.471,1253.08,1.53,1254.61,0.8
+RT-DETR Unstructured Pruned 50%,20184464,61.471,842.43,0.66,843.09,1.2
+RT-DETR Unstructured Pruned 70%,20184464,61.471,767.08,0.6,767.67,1.3

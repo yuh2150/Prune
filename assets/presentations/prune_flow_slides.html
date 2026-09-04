@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOP: Quy trình Pruning Mô hình Deep Learning chuẩn MLOps</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Mermaid CDN for Flowcharts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      theme: 'dark',
+      startOnLoad: true,
+      flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'cardinal' },
+      themeVariables: {
+        background: '#161b2b',
+        primaryColor: '#3b82f6',
+        primaryTextColor: '#f8fafc',
+        lineColor: '#475569',
+        secondaryColor: '#10b981',
+        tertiaryColor: '#f59e0b'
+      }
+    });
+  </script>
+
+  <style>
+    /* Design Tokens */
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-secondary: #131926;
+      --bg-card: rgba(22, 27, 43, 0.7);
+      --border-color: rgba(71, 85, 105, 0.4);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      
+      /* Accent Colors */
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-gold: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      
+      /* Fonts */
+      --font-heading: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-code: 'JetBrains Mono', monospace;
+      
+      /* Animation Easing */
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Base Layout Rules */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      overflow: hidden;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Slide Container */
+    .slides-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.8s var(--ease-out-expo), visibility 0.8s var(--ease-out-expo);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(1.5rem, 4vh, 3.5rem) clamp(2rem, 5vw, 6rem);
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      z-index: 2;
+    }
+
+    /* Contenteditable outline styles */
+    [contenteditable="true"] {
+      outline: none;
+      transition: box-shadow 0.2s ease, background-color 0.2s ease;
+      border-radius: 4px;
+    }
+    [contenteditable="true"]:hover {
+      box-shadow: 0 0 0 2px var(--accent-blue);
+      background-color: rgba(59, 130, 246, 0.1);
+      cursor: text;
+    }
+    [contenteditable="true"]:focus {
+      box-shadow: 0 0 0 2px var(--accent-blue);
+      background-color: rgba(59, 130, 246, 0.15);
+    }
+
+    /* Header Components */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: clamp(1rem, 2.5vh, 2rem);
+    }
+
+    .phase-badge {
+      font-family: var(--font-heading);
+      font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+      font-weight: 700;
+      color: var(--accent-blue);
+      background-color: rgba(59, 130, 246, 0.15);
+      border: 1px solid var(--accent-blue);
+      padding: 0.35rem 1rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .slide-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-top: 0.5rem;
+      line-height: 1.2;
+    }
+
+    /* Slide Layouts */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      gap: 2rem;
+      align-items: stretch;
+      justify-content: center;
+      min-height: 0; /* Important for flex child layout sizing */
+      margin-bottom: clamp(1rem, 2vh, 2rem);
+    }
+
+    /* Single / Dual Card Layouts */
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: clamp(1.2rem, 3vh, 2rem);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .card-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+      font-weight: 600;
+      color: var(--accent-blue);
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .card-title.accent-green { color: var(--accent-green); }
+    .card-title.accent-gold { color: var(--accent-gold); }
+    .card-title.accent-purple { color: var(--accent-purple); }
+
+    /* Staggered Animations */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s var(--ease-out-expo), transform 0.6s var(--ease-out-expo);
+    }
+
+    .slide.active .reveal {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Generate delay utility classes for list elements */
+    .delay-1 { transition-delay: 0.1s; }
+    .delay-2 { transition-delay: 0.2s; }
+    .delay-3 { transition-delay: 0.3s; }
+    .delay-4 { transition-delay: 0.4s; }
+    .delay-5 { transition-delay: 0.5s; }
+
+    /* Bullet List style */
+    .bullet-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.6rem, 1.8vh, 1.2rem);
+    }
+
+    .bullet-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.8rem;
+      font-size: clamp(0.85rem, 1.8vh, 1.05rem);
+      line-height: 1.5;
+    }
+
+    .bullet-label {
+      font-family: var(--font-heading);
+      font-weight: 600;
+      color: var(--accent-gold);
+      min-width: 90px;
+      flex-shrink: 0;
+    }
+
+    .bullet-text {
+      color: var(--text-primary);
+    }
+
+    .bullet-icon {
+      color: var(--accent-blue);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Comparison Table style */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: clamp(0.75rem, 1.6vh, 0.95rem);
+    }
+
+    .comp-table th, .comp-table td {
+      border: 1px solid var(--border-color);
+      padding: clamp(0.4rem, 1.2vh, 0.8rem);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .comp-table th {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--accent-blue);
+      font-family: var(--font-heading);
+      font-weight: 600;
+    }
+
+    /* Code Blocks */
+    .code-block {
+      background-color: #05080e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-code);
+      font-size: clamp(0.75rem, 1.5vh, 0.9rem);
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre;
+      margin-top: 0.5rem;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    /* Footer & Controls */
+    .slide-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .progress-bar-container {
+      flex: 1;
+      height: 4px;
+      background-color: var(--border-color);
+      margin: 0 2rem;
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      background-color: var(--accent-blue);
+      transition: width 0.3s ease;
+    }
+
+    .nav-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .nav-btn {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      background-color: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #ffffff;
+    }
+
+    /* Title Slide Specifics */
+    .title-slide {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: radial-gradient(circle at center, #111827 0%, #030712 100%);
+    }
+
+    .title-card {
+      max-width: 800px;
+      padding: 3rem;
+      border: 2px solid var(--accent-blue);
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.15);
+    }
+
+    .title-subtitle {
+      font-family: var(--font-heading);
+      font-size: clamp(1rem, 2.5vw, 1.4rem);
+      color: var(--accent-blue);
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .title-main {
+      font-family: var(--font-heading);
+      font-size: clamp(2rem, 5.5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, #ffffff 30%, #93c5fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-desc {
+      font-size: clamp(0.9rem, 2vw, 1.25rem);
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    .title-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 1.5rem;
+      text-align: left;
+    }
+
+    .meta-box {
+      font-size: clamp(0.75rem, 1.6vh, 0.9rem);
+    }
+
+    .meta-lbl {
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .meta-val {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Print styling */
+    @media print {
+      body { overflow: visible; height: auto; }
+      .slide { position: relative; opacity: 1; visibility: visible; page-break-after: always; height: 100vh; display: flex !important; }
+      .nav-controls, .progress-bar-container { display: none; }
+      .reveal { opacity: 1 !important; transform: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="slides-container">
+
+    <!-- SLIDE 1: TITLE SLIDE -->
+    <section class="slide title-slide active" id="slide-1">
+      <div class="card title-card reveal">
+        <div class="title-subtitle">MLOps Standard Operating Procedure</div>
+        <h1 class="title-main" contenteditable="true">QUY TRÌNH PRUNING MÔ HÌNH DEEP LEARNING</h1>
+        <p class="title-desc" contenteditable="true">Từ Requirement Gathering, Phân Tích Nhạy Cảm, Cắt Tỉa Kênh, Khôi Phục Accuracy Đến Deployment Thực Tế</p>
+        
+        <div class="title-meta">
+          <div class="meta-box">
+            <div class="meta-lbl">Chuyên gia thực hiện</div>
+            <div class="meta-val" contenteditable="true">MLOps & Model Optimization Team</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-lbl">Mô hình áp dụng</div>
+            <div class="meta-val" contenteditable="true">YOLOv5 / RT-DETR (PyTorch, ONNX, TRT)</div>
+          </div>
+          <div class="meta-box">
+            <div class="meta-lbl">Cấu trúc pipeline</div>
+            <div class="meta-val" contenteditable="true">10 Giai Đoạn Dự Án - Chuẩn Hóa Thực Thi</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: PHASE 0 - REQUIREMENTS -->
+    <section class="slide" id="slide-2">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 0: Requirement Gathering</div>
+        <div class="slide-number">0.1 - 0.3</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Thiết Lập SLO Kỹ Thuật & Môi Trường Mục Tiêu</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1">
+          <h3 class="card-title">Business & Hardware SLOs</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Mục tiêu:</span>
+              <span class="bullet-text" contenteditable="true">Quy đổi yêu cầu trải nghiệm người dùng thành các ràng buộc phần cứng chi tiết. Tránh nén lãng phí.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Phần cứng:</span>
+              <span class="bullet-text" contenteditable="true">Jetson Orin Nano (VRAM &lt; 2GB, TDP limit 15W) hoặc Server NVIDIA RTX 4090.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">SLO Target:</span>
+              <span class="bullet-text" contenteditable="true">Inference Latency &lt; 15ms, FPS &gt; 60, model size &lt; 10MB, mAP drop &lt;= 1.5% mAP@0.5.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-green">Runtime & Compatibility Gate</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Target Engine:</span>
+              <span class="bullet-text" contenteditable="true">Biên dịch ONNX Opset 17 sang TensorRT 8.6 Engine chạy trên FP16.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Kiểm tra:</span>
+              <span class="bullet-text" contenteditable="true">100% các layer của mô hình (ví dụ RepConv, Bottleneck) phải được hỗ trợ bởi target compiler.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Data setup:</span>
+              <span class="bullet-text" contenteditable="true">Tách dataset chuẩn hóa (train/val/test) có version bằng DVC để calibration gradient.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>2/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: PHASE 1 - AUDIT -->
+    <section class="slide" id="slide-3">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 1: Input Model & Dataset Audit</div>
+        <div class="slide-number">1.1 - 1.2</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Kiểm Duyệt Chất Lượng Kiểm Tra Baseline & Giấy Phép</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1">
+          <h3 class="card-title">Model Audit & Verification</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Độ hội tụ:</span>
+              <span class="bullet-text" contenteditable="true">Bắt buộc verify độ chính xác của model gốc trước khi prune. Prune model lỗi/chưa hội tụ sẽ gây sụp đổ accuracy hoàn toàn.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Baseline:</span>
+              <span class="bullet-text" contenteditable="true">YOLOv5s baseline đạt mAP50 = 0.568, Params = 7.22M, FLOPs = 16.5G, Size = 14.4MB.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Audit weights:</span>
+              <span class="bullet-text" contenteditable="true">Kiểm tra tensor shapes, check NaN/Inf, và chạy 1 epoch validation kiểm chứng số liệu.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-gold">License & Data Compliance</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">License:</span>
+              <span class="bullet-text" contenteditable="true">Kiểm tra mã nguồn và checkpoints gốc (ví dụ: Apache 2.0, MIT là an toàn; GPL/AGPL cần cẩn trọng trong commercial product).</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Tĩnh sạch:</span>
+              <span class="bullet-text" contenteditable="true">Dataset đã gán nhãn sạch 100%, được phân chia đồng đều và lưu vết phiên bản bằng DVC.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>3/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: PHASE 2 - ARCHITECTURE & DEPGRAPH -->
+    <section class="slide" id="slide-4">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 2: Model Analysis</div>
+        <div class="slide-number">2.1 - 2.2</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Phân Tích Kiến Trúc & Xây Dựng Đồ Thị Phụ Thuộc (DepGraph)</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1">
+          <h3 class="card-title">Computation Graph Profiling</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Resource:</span>
+              <span class="bullet-text" contenteditable="true">Sử dụng <code>torchinfo</code> và <code>thop</code> để bóc tách lượng Params & FLOPs của từng layer trong mạng.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Mục tiêu:</span>
+              <span class="bullet-text" contenteditable="true">Nhắm vào các Conv layers tiêu tốn nhiều tài nguyên nhất ( Backbone chiếm >80% FLOPs) để đạt tỷ lệ nén tối đa.</span>
+            </li>
+          </ul>
+          <div class="code-block" contenteditable="true">
+# Trace Params & FLOPs
+from torchinfo import summary
+summary(model, input_size=(1, 3, 640, 640))</div>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-purple">Dependency Tracing (DepGraph)</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Ràng buộc:</span>
+              <span class="bullet-text" contenteditable="true">Các liên kết Skip Connection (Residual Add/Concat) bắt buộc số kênh đầu ra/vào phải khớp nhau hoàn toàn.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Giải pháp:</span>
+              <span class="bullet-text" contenteditable="true">Sử dụng thư viện <code>Torch-Pruning</code> để tracing và gộp các layers liên quan thành các "Pruning Groups" không thể chia cắt.</span>
+            </li>
+          </ul>
+          <div class="code-block" contenteditable="true">
+import torch_pruning as tp
+DG = tp.DependencyGraph().build_dependency(model, x)
+# Get a pruning group for target layer
+group = DG.get_pruning_group(model.conv1, tp.prune_conv_out_channels, idxs=[0, 3, 5])</div>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>4/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: PHASE 2 (CONT) - SENSITIVITY & SELECTION -->
+    <section class="slide" id="slide-5">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 2: Model Analysis</div>
+        <div class="slide-number">2.3 - 2.4</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Phân Tích Độ Nhạy Cảm Layer & Thuật Toán Lựa Chọn</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1" style="flex: 1.2;">
+          <h3 class="card-title">Sensitivity Analysis Loop</h3>
+          <p style="font-size: 0.9rem; margin-bottom: 0.8rem;" contenteditable="true">Đo mức độ sụt giảm accuracy (mAP) lập tức của validation set khi cắt tỉa từng layer độc lập ở các tỷ lệ [10%, 30%, 50%, 70%, 90%].</p>
+          <ul class="bullet-list" style="margin-bottom: 1rem;">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Sensitive:</span>
+              <span class="bullet-text" contenteditable="true">Lớp nhạy cảm cao (mAP rớt mạnh &gt; 10%) → Gán tỉ lệ tỉa rất thấp hoặc giữ nguyên để tránh vỡ mạng.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Robust:</span>
+              <span class="bullet-text" contenteditable="true">Lớp linh hoạt (mAP hầu như không đổi) → Gán tỉ lệ tỉa cao để triệt tiêu dư thừa.</span>
+            </li>
+          </ul>
+          <div class="code-block" style="font-size: 0.8rem;" contenteditable="true">
+# Run sensitivity sweep per layer index
+for layer_idx in prunable_layers:
+    for ratio in [0.1, 0.3, 0.5, 0.7]:
+        pruned_model = prune_layer_temp(model, layer_idx, ratio)
+        mAP = evaluate(pruned_model, val_dataset)
+        save_sensitivity_to_csv(layer_idx, ratio, mAP)</div>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-green">Optimized Layer Selection</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Score:</span>
+              <span class="bullet-text" contenteditable="true">Điểm số lựa chọn = Lượng Params/FLOPs tiết kiệm được × mAP^20.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Quyết định:</span>
+              <span class="bullet-text" contenteditable="true">Chạy thuật toán tìm ngưỡng cắt (Cutoff Threshold) tối ưu để gộp nhóm các layers được phép nén.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Lưu trữ:</span>
+              <span class="bullet-text" contenteditable="true">Tự động vẽ và xuất đồ thị Sensitivity và scores ra thư mục <code>graphs/</code>.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>5/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: PHASE 3 - CRITERION & STRATEGY -->
+    <section class="slide" id="slide-6">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 3: Pruning Selection</div>
+        <div class="slide-number">3.1 - 3.3</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Lựa Chọn Tiêu Chí Đánh Giá & Chiến Lược Phân Bổ</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1">
+          <h3 class="card-title">Magnitude vs Gradient Criteria</h3>
+          <table class="comp-table">
+            <thead>
+              <tr>
+                <th>Tiêu chí</th>
+                <th>Công thức toán</th>
+                <th>Ưu điểm</th>
+                <th>Nhược điểm</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600;">L1/L2 Norm</td>
+                <td><code style="font-size: 0.8rem;">||W||_1, ||W||_2</code></td>
+                <td>Chạy cực nhanh, không cần dữ liệu</td>
+                <td>Bị mù với hàm loss mục tiêu</td>
+              </tr>
+              <tr style="background-color: rgba(16, 185, 129, 0.08);">
+                <td style="font-weight: 600; color: var(--accent-green);">Taylor First-order</td>
+                <td style="color: var(--accent-green);"><code style="font-size: 0.8rem;">|(dL/dW)*W|</code></td>
+                <td style="color: var(--accent-green);">Chính xác vượt trội nhờ thông tin Gradient</td>
+                <td>Cần calibration pass (dataloader)</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.8rem;" contenteditable="true">
+            *Khuyến nghị: Sử dụng Taylor Expansion làm mặc định khi có calibration dataset nhằm tối thiểu hóa sụt giảm độ chính xác.
+          </p>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-gold">Global vs Local Strategy</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Local:</span>
+              <span class="bullet-text" contenteditable="true">Prune cố định x% trên mọi layer. Dễ triển khai nhưng gây tổn thương nặng cho các sensitive layers.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Global:</span>
+              <span class="bullet-text" contenteditable="true">Đưa tất cả importance score của toàn mạng vào một pool chung, sắp xếp và cắt theo ngưỡng toàn cục. Tự động bảo vệ lớp nhạy cảm.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Quy đổi:</span>
+              <span class="bullet-text" contenteditable="true">Quy đổi target latency giảm 37% thành mục tiêu giảm ~35% FLOPs lý thuyết.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>6/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: PHASE 4 - STRUCTURED CHANNEL PRUNING -->
+    <section class="slide" id="slide-7">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 4: Model Pruning Execution</div>
+        <div class="slide-number">4.1 - 4.2</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Thực Thi Structured Channel Pruning & Align Phần Cứng</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1" style="flex: 1.2;">
+          <h3 class="card-title">Structured Channel Pruning</h3>
+          <p style="font-size: 0.85rem; margin-bottom: 0.8rem;" contenteditable="true">Loại bỏ toàn bộ filter (kênh đầu ra) và kênh đầu vào tương ứng, giúp giảm trực tiếp chiều của tensor vật lý, mang lại speedup trên mọi GPU.</p>
+          <div class="code-block" style="font-size: 0.75rem;" contenteditable="true">
+# Perform structured pruning step in Torch-Pruning
+import torch_pruning as tp
+importance = tp.importance.TaylorImportance()
+ignored_layers = [m for m in model.modules() if isinstance(m, Detect)]
+
+pruner = tp.pruner.MetaPruner(
+    model,
+    example_inputs=torch.randn(1, 3, 640, 640),
+    importance=importance,
+    pruning_ratio=0.35, # Global target 35%
+    ignored_layers=ignored_layers,
+    round_to=8          # Hardware Core Alignment
+)
+pruner.step()</div>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-green">Hardware Tensor Core Alignment</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Tại sao:</span>
+              <span class="bullet-text" contenteditable="true">NVIDIA Tensor Cores (và các dòng NPU) hoạt động tối ưu nhất khi số kênh ma trận chia hết cho 8 hoặc 16 (FP16/INT8).</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Vấn đề:</span>
+              <span class="bullet-text" contenteditable="true">Cắt tỉa ngẫu nhiên dẫn đến số kênh lẻ (vd: 53 kênh) sẽ làm vô hiệu hóa Tensor Cores, làm chậm inference đi 2-3x.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Cài đặt:</span>
+              <span class="bullet-text" contenteditable="true">Bắt buộc cấu hình tham số <code>round_to=8</code> hoặc <code>round_to=16</code> khi build pruner.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>7/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: PHASE 4 (CONT) - LAYER PRUNING -->
+    <section class="slide" id="slide-8">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 4: Model Pruning Execution</div>
+        <div class="slide-number">4.3</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Thực Thi Structured Layer Pruning (Depth Pruning)</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1" style="flex: 1.1;">
+          <h3 class="card-title">Structured Layer/Depth Pruning</h3>
+          <p style="font-size: 0.85rem; margin-bottom: 0.6rem;" contenteditable="true">Xóa bỏ hoàn toàn các Residual Blocks (Bottleneck) dư thừa trong các cụm C3/C2f thay vì chỉ tỉa bề rộng channel. Cực kỳ hiệu quả cho mô hình quá sâu.</p>
+          <div class="code-block" style="font-size: 0.75rem;" contenteditable="true">
+# In prune.py
+def prune_layers(model, pruning_params, criterion=0):
+    # pruning_params: [(layer_id, remove_num), ...]
+    for layer_id, remove_num in pruning_params:
+        module = model.model[layer_id]
+        if isinstance(module, C3):
+            # Score each block based on magnitude of the 3x3 conv
+            scores = _score_bottlenecks(module.m, criterion)
+            keep_idx = torch.argsort(scores, descending=True)[:len(module.m) - remove_num]
+            keep_idx = keep_idx.sort().values.tolist()
+            # Replace sequential container
+            module.m = nn.Sequential(*[module.m[i] for i in keep_idx])
+    return model</div>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-purple">Depth vs Width Pruning</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Độ tương thích:</span>
+              <span class="bullet-text" contenteditable="true">Depth Pruning không thay đổi tensor shape của các khối nối tiếp, do đó không đòi hỏi DepGraph để đồng bộ chiều.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Tốc độ:</span>
+              <span class="bullet-text" contenteditable="true">Giảm Latency tuyến tính tuyệt đối theo chiều sâu bị cắt bỏ.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Khôi phục:</span>
+              <span class="bullet-text" contenteditable="true">Yêu cầu epochs retrain nhiều hơn (10-20 epochs) kèm Knowledge Distillation.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>8/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 9: PHASE 5 - ACCURACY RECOVERY -->
+    <section class="slide" id="slide-9">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 5: Model Recovery</div>
+        <div class="slide-number">5.1 - 5.3</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Khôi Phục Độ Chính Xác Qua Fine-Tuning & Distillation</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1">
+          <h3 class="card-title">Retraining Hyperparameters</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Chiến lược:</span>
+              <span class="bullet-text" contenteditable="true">Model sau nén có dung lượng nhỏ hơn nên rất dễ bị Overfitting nếu giữ nguyên hyperparameters huấn luyện gốc.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Thiết lập:</span>
+              <span class="bullet-text" contenteditable="true">Giảm Weight Decay xuống 50% (ví dụ: 0.0005 -> 0.00025), giảm LR ban đầu 10x, và giảm nhẹ cường độ Data Augmentations.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Epochs:</span>
+              <span class="bullet-text" contenteditable="true">Thực hiện retrain ngắn từ 5-10 epochs kèm theo Cosine Annealing Learning Rate.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-green">Teacher-Student Knowledge Distillation (KD)</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Cơ chế:</span>
+              <span class="bullet-text" contenteditable="true">Sử dụng mô hình gốc (Unpruned) làm Teacher để dẫn dắt mô hình sau tỉa (Pruned Student) học lại các phân bổ xác suất và feature maps.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Công thức:</span>
+              <span class="bullet-text" contenteditable="true">Loss = alpha * HardLabelLoss + (1 - alpha) * KL_DivergenceLoss(Student_logits, Teacher_logits).</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Hiệu quả:</span>
+              <span class="bullet-text" contenteditable="true">Rút ngắn 50% số lượng epochs retrain và giúp hồi phục thêm 1-2% mAP so với retrain thông thường.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>9/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: PHASE 6 - BENCHMARK -->
+    <section class="slide" id="slide-10">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 6: Benchmark & Validation</div>
+        <div class="slide-number">6.1 - 6.2</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Đo Đạc Hiệu Năng & Bóc Tách Latency (Inference vs NMS)</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1" style="flex: 1.2;">
+          <h3 class="card-title">Decoupled Latency Analysis</h3>
+          <p style="font-size: 0.85rem; margin-bottom: 0.8rem;" contenteditable="true">Đo đạc độc lập: (1) Forward Pass Latency của mạng trên GPU, và (2) NMS / Post-processing Latency chạy trên CPU. Tránh CPU NMS làm mờ đi hiệu quả prune trên GPU.</p>
+          
+          <table class="comp-table">
+            <thead>
+              <tr>
+                <th>Mô hình</th>
+                <th>Params</th>
+                <th>FLOPs</th>
+                <th>mAP@0.5</th>
+                <th>Inference GPU</th>
+                <th>NMS CPU</th>
+                <th>Tổng Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600;">Baseline YOLOv5s</td>
+                <td>7.22M</td>
+                <td>16.5G</td>
+                <td>56.8%</td>
+                <td>8.2 ms</td>
+                <td>14.2 ms</td>
+                <td>22.4 ms (44.6 FPS)</td>
+              </tr>
+              <tr style="background-color: rgba(16, 185, 129, 0.08); font-weight: 600; color: var(--accent-green);">
+                <td>Pruned (Taylor + 8-Align)</td>
+                <td>4.33M (-40%)</td>
+                <td>10.7G (-35%)</td>
+                <td>55.6% (-1.2%)</td>
+                <td>5.1 ms (-38%)</td>
+                <td>9.0 ms (-36%)</td>
+                <td>14.1 ms (-37% / 70.9 FPS)</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.8rem;" contenteditable="true">
+            *Kết quả: Đạt mục tiêu Latency &lt; 15ms và sụt giảm mAP 1.2% (trong ngưỡng cho phép &lt;= 1.5%).
+          </p>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>10/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 11: PHASE 7 - DECISION GATE -->
+    <section class="slide" id="slide-11">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 7: Decision Gate</div>
+        <div class="slide-number">7.0</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Điểm Quyết Định "TARGET MET?" & Logic Vòng Lặp</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1" style="flex: 1.5;">
+          <h3 class="card-title">Quy Trình Quyết Định Chuẩn (Decision Logic Flow)</h3>
+          <!-- Mermaid Container -->
+          <pre class="mermaid" style="background: transparent; border: none; text-align: center;">
+graph TD
+    A[Bắt đầu Decision Gate] --> B{Đo đạc thực tế trên Hardware}
+    B -->|mAP drop > 1.5%| C[LOOP-BACK PHASE 3: Giảm tỉ lệ prune / Đổi sang Taylor]
+    B -->|Latency > 15ms| D[LOOP-BACK PHASE 3: Tăng tỉ lệ prune các layer ít nhạy cảm]
+    B -->|mAP drop <= 1.5% AND Latency <= 15ms| E[PASS GATE: Ký duyệt bàn giao sang Phase 8 Export]
+    style C fill:#ef4444,stroke:#ef4444,color:#fff
+    style D fill:#f59e0b,stroke:#f59e0b,color:#fff
+    style E fill:#10b981,stroke:#10b981,color:#fff
+          </pre>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-purple">Checklist Nghiệm Thu Gate</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Accuracy:</span>
+              <span class="bullet-text" contenteditable="true">mAP50 drop = 1.2% (ĐẠT &lt;= 1.5%)</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Latency:</span>
+              <span class="bullet-text" contenteditable="true">Latency = 14.1ms (ĐẠT &lt; 15ms)</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Model Size:</span>
+              <span class="bullet-text" contenteditable="true">Size = 8.6MB (ĐẠT &lt; 10MB)</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>11/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 12: PHASE 8 & 9 - EXPORT & DEPLOYMENT -->
+    <section class="slide" id="slide-12">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 8 & 9: Export & Deployment</div>
+        <div class="slide-number">8.1 - 9.2</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">ONNX Export, Kiểm Tra Sai Số Số Học & TensorRT Engine</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1">
+          <h3 class="card-title">ONNX Export & Verification</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Graph simplify:</span>
+              <span class="bullet-text" contenteditable="true">Xuất mô hình sang ONNX Opset 17, thực hiện Constant Folding và chạy <code>onnxsim</code> để fuse Conv+BN và xóa node thừa.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Numeric test:</span>
+              <span class="bullet-text" contenteditable="true">Feed 1000 test samples ngẫu nhiên vào cả PyTorch và ONNX, tính L1/L2 Max Error. Yêu cầu sai lệch số học &lt; 1e-4.</span>
+            </li>
+          </ul>
+          <div class="code-block" style="font-size: 0.8rem;" contenteditable="true">
+# ONNX verification snippet
+import numpy as np
+import onnxruntime as ort
+# Compare PyTorch output with ONNX output
+diff = np.abs(py_out - onnx_out)
+assert diff.max() < 1e-4, "Numerical drift detected!"</div>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-green">TensorRT Compilation & Go-Live</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Biên dịch TRT:</span>
+              <span class="bullet-text" contenteditable="true">Chạy <code>trtexec</code> biên dịch mô hình sang FP16 engine trên phần cứng thiết bị đích (Jetson/GPU).</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Deployment:</span>
+              <span class="bullet-text" contenteditable="true">Thực hiện Canary release điều hướng 10% traffic thực tế sang mô hình pruned. Giám sát tỉ lệ dự đoán lỗi.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✦</span>
+              <span class="bullet-label">Rollback:</span>
+              <span class="bullet-text" contenteditable="true">Chuẩn bị sẵn rollback script tự động trả về baseline model nếu latency/accuracy thực tế gặp sự cố.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>12/13</span>
+      </div>
+    </section>
+
+    <!-- SLIDE 13: PHASE 10 - LESSONS & PITFALLS -->
+    <section class="slide" id="slide-13">
+      <div class="slide-header">
+        <div class="phase-badge">Phase 10: Lessons Learned & Pitfalls</div>
+        <div class="slide-number">10.0</div>
+      </div>
+      <h2 class="slide-title" contenteditable="true">Bài Học Kinh Nghiệm & Cạm Bẫy Thường Gặp Trong MLOps</h2>
+      
+      <div class="slide-body">
+        <div class="card reveal delay-1">
+          <h3 class="card-title accent-red">Cạm Bẫy Kỹ Thuật (Common Pitfalls)</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon" style="color: var(--accent-red);">✗</span>
+              <span class="bullet-label" style="color: var(--accent-red);">Over-Pruning:</span>
+              <span class="bullet-text" contenteditable="true">Tỉa quá aggressive (&gt; 50%) trong một bước làm sụp đổ không gian biểu diễn. Khắc phục: Sử dụng Iterative Pruning (tỉa lặp lại 10% mỗi lần).</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon" style="color: var(--accent-red);">✗</span>
+              <span class="bullet-label" style="color: var(--accent-red);">Trôi kênh:</span>
+              <span class="bullet-text" contenteditable="true">Xóa kênh lệch tại các nút Residual Add gây crash tensor. Khắc phục: Bắt buộc dùng DepGraph để đồng bộ nhóm kênh.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon" style="color: var(--accent-red);">✗</span>
+              <span class="bullet-label" style="color: var(--accent-red);">Lệch phần cứng:</span>
+              <span class="bullet-text" contenteditable="true">Prune unstructured (tỉa trọng số lẻ) nhưng chạy trên GPU thường. Khắc phục: Dùng Structured Channel Pruning để tăng tốc thực tế.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="card reveal delay-2">
+          <h3 class="card-title accent-green">Best Practices Nghiệm Thu</h3>
+          <ul class="bullet-list">
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Align bội 8:</span>
+              <span class="bullet-text" contenteditable="true">Mọi convolutional layer sau khi tỉa bắt buộc có số channels còn lại chia hết cho 8 để tối ưu hóa CUDA Tensor Cores.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Luôn retrain:</span>
+              <span class="bullet-text" contenteditable="true">Dành ít nhất 5-10 epochs để recovery weights, kết hợp Knowledge Distillation để hồi phục mAP tiệm cận baseline.</span>
+            </li>
+            <li class="bullet-item">
+              <span class="bullet-icon">✔</span>
+              <span class="bullet-label">Bóc tách lat:</span>
+              <span class="bullet-text" contenteditable="true">Luôn phân tách thời gian forward mạng khỏi thời gian NMS trên CPU khi đánh giá benchmark hiệu năng.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="slide-footer">
+        <span>Model Optimization SOP</span>
+        <div class="progress-bar-container"><div class="progress-bar-fill"></div></div>
+        <span>13/13</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Navigation Script -->
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const progressBarFills = document.querySelectorAll('.progress-bar-fill');
+    let currentSlideIndex = 0;
+
+    function showSlide(index) {
+      if (index < 0 || index >= slides.length) return;
+      
+      // Update classes
+      slides[currentSlideIndex].classList.remove('active');
+      slides[index].classList.add('active');
+      
+      currentSlideIndex = index;
+      
+      // Update progress bar
+      const progressPercent = ((currentSlideIndex + 1) / slides.length) * 100;
+      progressBarFills.forEach(fill => {
+        fill.style.width = `${progressPercent}%`;
+      });
+
+      // Rerender mermaid if the slide contains it (Mermaid handles dynamic elements)
+      const currentSlide = slides[currentSlideIndex];
+      const mermaidElement = currentSlide.querySelector('.mermaid');
+      if (mermaidElement && mermaidElement.getAttribute('data-processed') === 'true') {
+        // Force layout repaint
+        window.dispatchEvent(new Event('resize'));
+      }
+    }
+
+    // Keyboard Navigation
+    document.addEventListener('keydown', (e) => {
+      // Ignore if user is editing text
+      if (document.activeElement.getAttribute('contenteditable') === 'true') {
+        return;
+      }
+      
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        if (currentSlideIndex < slides.length - 1) {
+          showSlide(currentSlideIndex + 1);
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        if (currentSlideIndex > 0) {
+          showSlide(currentSlideIndex - 1);
+        }
+      }
+    });
+
+    // Touch Swipe Support
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', e => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, false);
+
+    document.addEventListener('touchend', e => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, false);
+
+    function handleSwipe() {
+      // Ignore if user is editing text
+      if (document.activeElement.getAttribute('contenteditable') === 'true') {
+        return;
+      }
+
+      const threshold = 50;
+      if (touchEndX < touchStartX - threshold) {
+        // Swipe left -> Next
+        if (currentSlideIndex < slides.length - 1) {
+          showSlide(currentSlideIndex + 1);
+        }
+      }
+      if (touchEndX > touchStartX + threshold) {
+        // Swipe right -> Prev
+        if (currentSlideIndex > 0) {
+          showSlide(currentSlideIndex - 1);
+        }
+      }
+    }
+
+    // Initialize progress bars on start
+    showSlide(0);
+  </script>
+</body>
+</html>

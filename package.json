@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@types/exceljs": "^0.5.3",
+    "@types/node": "^26.4.0",
+    "exceljs": "^4.4.0",
+    "pptxgenjs": "^4.0.1",
+    "typescript": "^7.0.2"
+  }
+}
