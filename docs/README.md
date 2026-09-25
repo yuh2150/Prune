@@ -23,6 +23,12 @@ New Developer / User
   └── End-to-End Data Flow
          │
          ▼
+[Unified Experiment Pipeline](architecture/unified-pipeline.md)
+  ├── Reproducible experiment artifacts
+  ├── Evaluation, calibration and recovery callbacks
+  └── Global structured-pruning protocol
+         │
+         ▼
 [3. Core Concepts](concepts/pruning-and-sensitivity.md)
   ├── Pruning Strategies (Structured, Unstructured, Depth, Taylor)
   ├── Sensitivity Analysis & Profiling

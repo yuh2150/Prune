@@ -1,17 +1,31 @@
 import os
+import copy
 import torch
 import torch.nn as nn
+
+from prune_framework.modules.model.masks import MaskManager
 
 
 class ModelExporter:
     """Exports pruned PyTorch models to ONNX or PyTorch checkpoints."""
 
     @staticmethod
-    def export_onnx(model: nn.Module, dummy_input: torch.Tensor, output_path: str, opset_version: int = 12):
+    def export_onnx(
+        model: nn.Module,
+        dummy_input: torch.Tensor,
+        output_path: str,
+        opset_version: int = 12,
+        materialize_masks: bool = True,
+    ):
         os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
-        model.eval()
+        # Deployment export is an explicit materialization boundary. Work on a
+        # clone so the training/recovery model retains its persistent masks.
+        export_model = copy.deepcopy(model) if materialize_masks else model
+        if materialize_masks:
+            MaskManager.materialize(export_model)
+        export_model.eval()
         torch.onnx.export(
-            model,
+            export_model,
             dummy_input,
             output_path,
             opset_version=opset_version,

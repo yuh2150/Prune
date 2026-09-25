@@ -1,0 +1,48 @@
+model:
+  name: yolov5
+  weights: weights/yolov5s.pt
+  device: cuda
+
+pruning:
+  method: structured
+  criterion: taylor
+  structure: channel
+  target_ratio: 0.30
+  global: true
+  min_channels: 8
+  calibration_callback: experiments.yolov5:calibrate_taylor
+
+sensitivity:
+  enabled: true
+  rates: [0.10, 0.20, 0.30, 0.40]
+  selector: sensitivity
+  max_allowed_relative_drop: 0.05
+
+evaluation:
+  enabled: true
+  callback: experiments.yolov5:evaluate
+  metric: map
+
+recovery:
+  enabled: true
+  epochs: 10
+  callback: experiments.yolov5:recover
+
+benchmark:
+  latency: true
+  flops: true
+  params: true
+  warmup: 20
+  runs: 100
+
+export:
+  onnx: true
+  output_path: artifacts/yolov5s_pruned.onnx
+
+experiment:
+  name: yolov5s_taylor_global_30
+  output_dir: artifacts
+  seed: 42
+  deterministic: true
+
+output_path: artifacts/yolov5s_taylor_global_30.pt

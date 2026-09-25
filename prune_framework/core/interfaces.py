@@ -9,6 +9,12 @@ from prune_framework.contracts import (
     BaseImportanceCriterion,
     BaseGranularity,
     BaseSelector,
+    ChannelSparsityTarget,
+    StructuralBlockTarget,
+    PrunableTarget,
+    PruningGroup,
+    PruningPlan,
+    TargetType,
 )
 
 __all__ = [
@@ -17,5 +23,10 @@ __all__ = [
     "BaseImportanceCriterion",
     "BaseGranularity",
     "BaseSelector",
+    "ChannelSparsityTarget",
+    "StructuralBlockTarget",
+    "PrunableTarget",
+    "PruningGroup",
+    "PruningPlan",
+    "TargetType",
 ]
-

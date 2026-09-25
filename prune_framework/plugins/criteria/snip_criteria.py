@@ -1,0 +1,39 @@
+"""SNIP saliency criterion for one-shot, element-wise pruning."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+import torch
+import torch.nn as nn
+
+from prune_framework.contracts.targets import TargetType
+from prune_framework.core.interfaces import BaseImportanceCriterion
+from prune_framework.core.registry import register_criterion
+
+
+@register_criterion("snip")
+class SNIPCriterion(BaseImportanceCriterion):
+    """Element-wise SNIP saliency: ``abs(W * dL/dW)``.
+
+    This criterion never mutates a module.  The detached calibration gradient
+    supplied in ``context`` is preferred so scoring cannot retain a backward
+    graph or rely on residual normal-training gradients.
+    """
+
+    requires_gradients = True
+    global_selection = True
+    calibration_target_types = {TargetType.CONV_WEIGHT, TargetType.LINEAR_WEIGHT}
+
+    def score(self, module: nn.Module, context: Optional[Dict[str, Any]] = None) -> torch.Tensor:
+        if not isinstance(module, (nn.Conv2d, nn.Linear)):
+            raise ValueError(f"SNIPCriterion supports Conv2d and Linear, got {type(module).__name__}.")
+        gradient = context.get("grad") if context else getattr(module.weight, "grad", None)
+        if gradient is None:
+            raise RuntimeError("SNIPCriterion requires a weight gradient from gradient calibration.")
+        if tuple(gradient.shape) != tuple(module.weight.shape):
+            raise ValueError(
+                f"SNIP gradient shape {tuple(gradient.shape)} does not match "
+                f"weight shape {tuple(module.weight.shape)}."
+            )
+        return (module.weight.detach() * gradient.detach()).abs().detach()

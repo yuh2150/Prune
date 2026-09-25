@@ -53,7 +53,7 @@ The codebase is organized into a modular framework package (`prune_framework`), 
 │   │   ├── sensitivity.py            # run_sensitivity_pipeline
 │   │   └── benchmarking.py           # run_benchmark_pipeline
 │   └── plugins/                      # Plugin Implementations
-│       ├── adapters/                 # YOLOv5Adapter, RTDetrAdapter, ResNetAdapter
+│       ├── adapters/                 # YOLOv5Adapter, RTDetrAdapter, YOLOv7 compatibility alias
 │       ├── criteria/                 # L1Norm, L2Norm, TaylorExpansion, Random
 │       ├── granularities/            # Channel, Filter, Layer
 │       ├── pruners/                  # Structured, Unstructured, Depth, Taylor

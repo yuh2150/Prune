@@ -1,6 +1,6 @@
 # Production Model Pruning Framework (Modular + Plugin Architecture)
 
-A professional, enterprise-grade model pruning framework for Deep Learning architectures (**YOLOv5**, **YOLOv7**, **RT-DETR**, **ResNet**).
+A plugin-based pruning framework for object-detection research. Registered adapters cover **YOLOv5**, a legacy **YOLOv7 compatibility alias**, and Hugging Face **RT-DETR**. ResNet is not currently implemented as an adapter.
 
 The framework enforces **Zero-Code-Change Core Extensibility** using a clean composition of four orthogonal plugin abstractions:
 
@@ -32,7 +32,8 @@ prune_framework/
 │   ├── adapters/              # yolov5, rtdetr
 │   └── selectors/             # sensitivity, greedy
 ├── pipelines/
-│   ├── pruning.py             # End-to-end Pruning execution
+│   ├── unified.py             # Reproducible, stage-based experiment workflow
+│   ├── pruning.py             # Backwards-compatible pruning entry point
 │   ├── sensitivity.py         # End-to-end Sensitivity Analysis
 │   └── benchmarking.py        # End-to-end Decoupled Latency Benchmark
 ├── configs/                   # Production YAML templates
@@ -76,6 +77,12 @@ python main.py --config configs/yolov5_unstructured.yaml
 # Transformer Depth Pruning on RT-DETR
 python main.py --config configs/rtdetr_structured.yaml
 ```
+
+For a full experiment protocol—baseline and final evaluation, sensitivity,
+recovery, complexity measurements and artifacts—start from
+[`configs/research_unified.yaml`](configs/research_unified.yaml). Dataset-specific
+evaluation and recovery are supplied as callbacks so the core does not hard-code
+a detector or training loop.
 
 ---
 

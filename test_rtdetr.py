@@ -17,6 +17,9 @@ from utils.torch_utils import select_device, time_synchronized
 
 from prune_framework.core import PluginRegistry, PruningEngine
 from prune_framework.modules.model.loader import ModelLoader
+from prune_framework.modules.evaluation.rtdetr_processors import RTDetrPreProcessor, RTDetrPostProcessor
+from prune_framework.modules.evaluation.coco_evaluator import COCOEvaluator
+from prune_framework.modules.evaluation.pipeline import EvaluationPipeline
 from dataset_coco_rtdetr import CocoEvalDataset, eval_collate_fn
 
 def test(data,
@@ -149,10 +152,6 @@ def test(data,
     evaluated_img_ids = []
     t0, t1 = 0.0, 0.0
     
-from prune_framework.modules.evaluation.rtdetr_processors import RTDetrPreProcessor, RTDetrPostProcessor
-from prune_framework.modules.evaluation.coco_evaluator import COCOEvaluator
-from prune_framework.modules.evaluation.pipeline import EvaluationPipeline
-
     # Instantiate decoupled PreProcessor, PostProcessor, Evaluator and Pipeline
     preprocessor = RTDetrPreProcessor(hf_dir)
     postprocessor = RTDetrPostProcessor(hf_dir)

@@ -1,12 +1,6 @@
-# Configuration & CLI Reference
+# Configuration reference
 
-This document provides a reference for YAML configuration parameters and CLI command line arguments.
-
----
-
-## 1. YAML Configuration Reference (`FrameworkConfig`)
-
-Sample YAML configuration file (`configs/yolov5_structured.yaml`):
+`FrameworkConfig` accepts the original keys (`pruner`, `granularity`, `amount`) and the research schema (`method`, `structure`, `target_ratio`). Do not mix an alias with its original name in the same section.
 
 ```yaml
 model:
@@ -15,79 +9,49 @@ model:
   device: cuda
 
 pruning:
-  pruner: structured
+  method: structured       # alias: pruner
   criterion: l1
-  granularity: channel
-  amount: 0.3
-  layer_params: null
+  structure: channel       # alias: granularity
+  target_ratio: 0.30       # alias: amount
+  global: true             # stored as global_pruning
+  min_channels: 8
 
-analysis:
-  sensitivity: false
-  layer_selection: false
+sensitivity:
+  enabled: true
+  rates: [0.1, 0.2, 0.3]
+  selector: sensitivity
+  max_allowed_relative_drop: 0.05
+
+evaluation:
+  enabled: true
+  callback: experiments.yolov5:evaluate
+  metric: map
+
+recovery:
+  enabled: true
+  epochs: 10
+  callback: experiments.yolov5:recover
 
 benchmark:
-  enabled: true
-  runs: 50
-  warmup: 10
+  latency: true
+  flops: true
+  params: true
+  warmup: 20
+  runs: 100
 
 export:
-  enabled: false
-  format: onnx
-  output_path: pruned_yolov5s.onnx
+  onnx: true
+  output_path: artifacts/model.onnx
 
-output_path: pruned_yolov5s.pt
+experiment:
+  name: yolov5_l1_30
+  output_dir: artifacts
+  seed: 42
+  deterministic: true
 ```
 
----
+`evaluation.callback`, `recovery.callback`, and `pruning.calibration_callback` use `package.module:function` notation. The evaluation callback returns a metric float, a metric dictionary, or `EvaluationResult`. A recovery callback receives the pruned model and returns either that model or `None` after in-place training. Taylor requires a calibration callback that performs a representative backward pass before the pruning stage.
 
-## 2. Configuration Parameter Table
+The supported model names are the registered entries shown by `python main.py --list-models`; currently these are `yolov5`, a compatibility alias `yolov7`, and `rtdetr`. ResNet is not registered.
 
-### `model` Section
-| Parameter | Type | Default | Required | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `name` | `str` | `"yolov5"` | Yes | Registered model adapter name (`yolov5`, `rtdetr`, `resnet`). |
-| `weights` | `str` | `"yolov5s.pt"` | Yes | Path to weights checkpoint or HuggingFace hub model ID. |
-| `device` | `str` | `"cuda"` | No | Execution device (`"cuda"`, `"cuda:0"`, or `"cpu"`). |
-
-### `pruning` Section
-| Parameter | Type | Default | Required | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `pruner` | `str` | `"structured"` | Yes | Pruning strategy plugin (`structured`, `unstructured`, `depth`, `taylor`). |
-| `criterion` | `str` | `"l1"` | Yes | Importance metric plugin (`l1`, `l2`, `taylor`, `random`). |
-| `granularity` | `str` | `"channel"` | No | Pruning granularity plugin (`channel`, `filter`, `layer`). |
-| `amount` | `float` | `0.3` | Yes | Target sparsity or global pruning ratio (0.0 to 1.0). |
-| `layer_params`| `list` | `null` | No | Optional per-layer pruning tuples `[(layer_idx, rate), ...]`. |
-
-### `analysis` Section
-| Parameter | Type | Default | Required | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `sensitivity` | `bool` | `false` | No | Whether to execute Sensitivity Analysis sweep before pruning. |
-| `layer_selection` | `bool` | `false` | No | Whether to run automated Layer Selection based on sensitivity. |
-
-### `benchmark` & `export` Sections
-| Parameter | Type | Default | Required | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `benchmark.enabled` | `bool` | `true` | No | Whether to run post-pruning latency profiling. |
-| `benchmark.runs` | `int` | `100` | No | Number of benchmark inference iterations. |
-| `export.enabled` | `bool` | `false` | No | Whether to export pruned model to ONNX. |
-| `export.output_path`| `str` | `"pruned.onnx"`| No | Destination path for exported ONNX model. |
-
----
-
-## 3. CLI Argument Reference (`main.py`)
-
-| CLI Argument | Type | Description |
-| :--- | :--- | :--- |
-| `--config` | `str` | Path to YAML configuration file. |
-| `--model` | `str` | Model adapter architecture override (`yolov5`, `rtdetr`, `resnet`). |
-| `--weights` | `str` | Weights checkpoint path override. |
-| `--strategy` | `str` | Pruner strategy override (`structured`, `unstructured`, `depth`, `taylor`). |
-| `--criterion` | `str` | Importance criterion override (`l1`, `l2`, `taylor`, `random`). |
-| `--granularity` | `str` | Granularity override (`channel`, `filter`, `layer`). |
-| `--amount` | `float` | Target sparsity ratio override. |
-| `--output-path` | `str` | Output checkpoint path override. |
-| `--list-models` | Flag | Lists all registered model adapters. |
-| `--list-pruners` | Flag | Lists all registered pruners. |
-| `--list-criteria` | Flag | Lists all registered criteria. |
-| `--list-granularities` | Flag | Lists all registered granularities. |
-| `--list-selectors` | Flag | Lists all registered layer selectors. |
+The original `analysis.sensitivity` key remains accepted and maps to `sensitivity.enabled`. Its `analysis.layer_selection` flag is retained for old configuration compatibility; the unified pipeline runs its configured selector whenever sensitivity is enabled.

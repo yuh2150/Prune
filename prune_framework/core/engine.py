@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch.nn as nn
 from typing import Dict, Any, Optional
@@ -5,6 +6,7 @@ from .registry import PluginRegistry
 from .interfaces import BaseModelAdapter, BaseImportanceCriterion, BaseGranularity, BasePruner
 from .results import PruningResult
 from .logging import logger
+from prune_framework.modules.evaluation.validator import ModelValidator
 
 
 def count_parameters(model: nn.Module) -> int:
@@ -44,6 +46,8 @@ class PruningEngine:
         """
         Executes end-to-end pruning.
         """
+        config = dict(config or {})
+        config.setdefault("criterion_name", self.criterion_name)
         adapter: BaseModelAdapter = self.adapter_cls(model)
         pruner: BasePruner = self.pruner_cls()
         criterion: BaseImportanceCriterion = self.criterion_cls()
@@ -67,18 +71,22 @@ class PruningEngine:
         params_removed = params_before - params_after
         pct_removed = (params_removed / params_before * 100.0) if params_before > 0 else 0.0
 
+        validation = None
         forward_ok = False
         if verify_forward:
             device = next(pruned_model.parameters()).device
-            try:
-                dummy = adapter.get_dummy_input(device)
-                pruned_model.eval()
-                with torch.no_grad():
-                    _ = pruned_model(dummy)
-                forward_ok = True
+            dummy = adapter.get_dummy_input(device)
+            validation = ModelValidator.validate_architecture(
+                pruned_model, dummy, params_before=params_before, verify_checkpoint=True
+            )
+            # Preserve the legacy meaning of ``forward_verified``. Checkpoint
+            # round-trip is recorded as a separate architecture signal because
+            # third-party detector objects are not always deepcopy-safe.
+            forward_ok = validation.forward_verified and validation.parameter_count_verified
+            if forward_ok:
                 logger.info("Forward pass shape verification: SUCCESS ✅")
-            except Exception as e:
-                logger.warning(f"Forward pass shape verification WARNING: {e} ⚠️")
+            if not validation.valid:
+                logger.warning(f"Architecture validation WARNING: {validation.errors} ⚠️")
 
         logger.info("Pruning Completed Statistics:")
         logger.info(f" - Parameters Before: {params_before:,}")
@@ -93,5 +101,30 @@ class PruningEngine:
             params_before=params_before,
             params_after=params_after,
             params_reduction_pct=pct_removed,
-            forward_verified=forward_ok
+            forward_verified=forward_ok,
+            pruning_plan=getattr(pruner, "last_plan", None).describe() if getattr(pruner, "last_plan", None) else {},
+            architecture_validation=validation.describe() if validation is not None else {},
         )
+
+    def build_dependency_graph(self, model: nn.Module):
+        """Trace the current model for a structured-pruning safety preflight.
+
+        The graph must be rebuilt after each physical pruning operation because
+        module dimensions and graph edges change. This method deliberately does
+        not cache a graph across pruning steps.
+        """
+        try:
+            import torch_pruning as tp
+        except ImportError as exc:
+            raise RuntimeError("Structured pruning requires the 'torch_pruning' package.") from exc
+
+        adapter: BaseModelAdapter = self.adapter_cls(model)
+        device = next(model.parameters()).device
+        grad_states = {name: parameter.requires_grad for name, parameter in model.named_parameters()}
+        try:
+            for parameter in model.parameters():
+                parameter.requires_grad = True
+            return tp.DependencyGraph().build_dependency(model, adapter.get_dummy_input(device))
+        finally:
+            for name, parameter in model.named_parameters():
+                parameter.requires_grad = grad_states[name]
