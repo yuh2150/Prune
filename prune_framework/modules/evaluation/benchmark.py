@@ -1,4 +1,5 @@
 import time
+import statistics
 import torch
 import torch.nn as nn
 from prune_framework.core.results import BenchmarkResult
@@ -57,5 +58,20 @@ class LatencyBenchmark:
             inference_latency_ms=round(avg_inf_ms, 3),
             nms_latency_ms=round(avg_nms_ms, 3),
             total_latency_ms=round(total_ms, 3),
-            fps=round(fps, 2)
+            fps=round(fps, 2),
+            latency_std_ms=round(statistics.pstdev(inf_times), 3) if len(inf_times) > 1 else 0.0,
+            latency_p50_ms=round(_percentile(inf_times, 50), 3),
+            latency_p95_ms=round(_percentile(inf_times, 95), 3),
         )
+
+
+def _percentile(values, percentile: float) -> float:
+    """Linear percentile without a NumPy dependency."""
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = (len(ordered) - 1) * percentile / 100.0
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] * (1 - fraction) + ordered[upper] * fraction

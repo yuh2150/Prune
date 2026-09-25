@@ -3,6 +3,7 @@ import torch.nn as nn
 from typing import Optional, Dict, Any
 from prune_framework.core.interfaces import BaseImportanceCriterion
 from prune_framework.core.registry import register_criterion
+from prune_framework.contracts.targets import TargetType
 
 
 @register_criterion("taylor")
@@ -13,6 +14,8 @@ class TaylorFirstOrderCriterion(BaseImportanceCriterion):
     Score = |Weight * Gradient| summed over input channels and spatial dimensions.
     Requires gradients to be computed via backward pass before scoring.
     """
+    requires_gradients = True
+    calibration_target_types = {TargetType.CONV_OUT_CHANNEL}
 
     def score(self, module: nn.Module, context: Optional[Dict[str, Any]] = None) -> torch.Tensor:
         grad = context.get("grad") if context else None
@@ -28,4 +31,3 @@ class TaylorFirstOrderCriterion(BaseImportanceCriterion):
     def compute_scores(self, module: nn.Module, grad: Optional[torch.Tensor] = None) -> torch.Tensor:
         context = {"grad": grad} if grad is not None else None
         return self.score(module, context=context)
-

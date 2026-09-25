@@ -3,6 +3,7 @@ from .pruner import BasePruner
 from .criterion import BaseImportanceCriterion
 from .granularity import BaseGranularity
 from .selector import BaseSelector
+from .targets import ChannelSparsityTarget, PrunableTarget, PruningGroup, PruningPlan, StructuralBlockTarget, TargetType
 from .sensitivity_result import (
     SensitivityPoint,
     LayerSensitivityProfile,
@@ -24,6 +25,12 @@ __all__ = [
     "BaseImportanceCriterion",
     "BaseGranularity",
     "BaseSelector",
+    "PrunableTarget",
+    "ChannelSparsityTarget",
+    "StructuralBlockTarget",
+    "PruningGroup",
+    "PruningPlan",
+    "TargetType",
     "SensitivityPoint",
     "LayerSensitivityProfile",
     "SensitivityResult",
@@ -35,5 +42,3 @@ __all__ = [
     "BasePostProcessor",
     "BaseEvaluator",
 ]
-
-

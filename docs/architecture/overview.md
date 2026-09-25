@@ -27,7 +27,7 @@ flowchart TD
     end
 
     subgraph Plugin Registry
-        Adapters["Model Adapters (YOLOv5, RT-DETR, ResNet)"]
+        Adapters["Model Adapters (YOLOv5, YOLOv7 alias, RT-DETR)"]
         Pruners["Pruner Plugins (Structured, Unstructured, Depth, Taylor)"]
         Criteria["Importance Criteria (L1, L2, Taylor, Random)"]
         Selectors["Selector Plugins (Sensitivity, Greedy, Threshold)"]

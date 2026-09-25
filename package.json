@@ -3,7 +3,11 @@
     "@types/exceljs": "^0.5.3",
     "@types/node": "^26.4.0",
     "exceljs": "^4.4.0",
+    "fontkit": "^2.0.4",
+    "linebreak": "^1.1.0",
     "pptxgenjs": "^4.0.1",
+    "prismjs": "^1.30.0",
+    "skia-canvas": "^3.0.8",
     "typescript": "^7.0.2"
   }
 }

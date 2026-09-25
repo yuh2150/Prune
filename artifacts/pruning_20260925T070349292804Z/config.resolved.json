@@ -1,0 +1,88 @@
+{
+  "analysis": {
+    "layer_selection": false,
+    "sensitivity": false
+  },
+  "benchmark": {
+    "enabled": false,
+    "flops": false,
+    "latency": false,
+    "params": false,
+    "runs": 1,
+    "warmup": 10
+  },
+  "evaluation": {
+    "callback": null,
+    "enabled": false,
+    "kwargs": {},
+    "metric": "map"
+  },
+  "experiment": {
+    "deterministic": true,
+    "name": "pruning",
+    "output_dir": "artifacts",
+    "seed": 42
+  },
+  "export": {
+    "enabled": false,
+    "format": "onnx",
+    "onnx": false,
+    "opset_version": 12,
+    "output_path": "pruned_model.onnx"
+  },
+  "model": {
+    "device": "cpu",
+    "input_shape": [
+      1,
+      3,
+      640,
+      640
+    ],
+    "name": "rtdetr",
+    "weights": "unused"
+  },
+  "output_path": "pruned_checkpoint.pt",
+  "pruning": {
+    "amount": 0.25,
+    "calibration_accumulate": true,
+    "calibration_batch_size": 1,
+    "calibration_batches": 1,
+    "calibration_callback": null,
+    "calibration_seed": 42,
+    "criterion": "taylor",
+    "global_pruning": false,
+    "granularity": "channel",
+    "iterative_steps": 1,
+    "layer_params": null,
+    "min_channels": 2,
+    "pruner": "structured"
+  },
+  "recovery": {
+    "callback": null,
+    "enabled": false,
+    "epochs": 0,
+    "kwargs": {}
+  },
+  "regularization": {
+    "enabled": false,
+    "pruning_criterion": "bn_scale",
+    "schedule": "constant",
+    "strength": 0.0,
+    "term": "l1_bn_scale",
+    "total_steps": 0,
+    "warmup_steps": 0
+  },
+  "sensitivity": {
+    "enabled": false,
+    "max_allowed_relative_drop": 0.05,
+    "metric_direction": "higher_is_better",
+    "rates": [
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5
+    ],
+    "selector": "sensitivity"
+  }
+}
