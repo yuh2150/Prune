@@ -22,6 +22,10 @@ from prune_framework.modules.evaluation.coco_evaluator import COCOEvaluator
 from prune_framework.modules.evaluation.pipeline import EvaluationPipeline
 from dataset_coco_rtdetr import CocoEvalDataset, eval_collate_fn
 
+# This is a CLI evaluation entry point retained for compatibility, not a
+# pytest test (its ``test`` function takes runtime CLI arguments).
+__test__ = False
+
 def test(data,
          weights=None,
          batch_size=32,

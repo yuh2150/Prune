@@ -109,12 +109,13 @@ class TestL0HardConcrete(unittest.TestCase):
         self.controller.advance(3)
         gate_before = self.first_gate.log_alpha.detach().clone()
 
-        with tempfile.NamedTemporaryFile(suffix=".pt") as handle:
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/checkpoint.pt"
             torch.save(
                 {"model": self.model.state_dict(), "optimizer": optimizer.state_dict(), "regularization": self.controller.state_dict()},
-                handle.name,
+                path,
             )
-            checkpoint = torch.load(handle.name, weights_only=True)
+            checkpoint = torch.load(path, weights_only=True)
         restored = ConvBNDetector()
         restored_adapter = YOLOv5Adapter(restored)
         restored_term = L0HardConcreteRegularization(log_alpha_init=0.0)

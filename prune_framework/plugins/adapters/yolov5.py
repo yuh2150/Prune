@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import Callable, Iterable, List, Tuple, Optional, Any, Set
 from prune_framework.core.interfaces import BaseModelAdapter
 from prune_framework.core.registry import register_model
-from prune_framework.contracts.targets import PrunableTarget, StructuralBlockTarget, TargetType
+from prune_framework.contracts.targets import AttentionHeadTarget, PrunableTarget, StructuralBlockTarget, TargetType
 
 
 @register_model("yolov5")
@@ -67,6 +67,18 @@ class YOLOv5Adapter(BaseModelAdapter):
                 if TargetType.LINEAR_OUT_FEATURE in allowed:
                     targets.append(PrunableTarget(name, module, TargetType.LINEAR_OUT_FEATURE))
         return targets
+
+    def get_attention_head_targets(self) -> List[AttentionHeadTarget]:
+        """Expose only C3TR TransformerLayer attention with residual-safe width."""
+        try:
+            from models.common import TransformerLayer
+        except ImportError:
+            return []
+        return [
+            AttentionHeadTarget(f"{name}.ma", module.ma, module, "ma", {"family": "yolo_c3tr"})
+            for name, module in self.model.named_modules()
+            if isinstance(module, TransformerLayer) and isinstance(getattr(module, "ma", None), nn.MultiheadAttention)
+        ]
 
     def get_pruneable_conv_layers(self) -> List[Tuple[str, nn.Conv2d]]:
         """Alias for get_pruneable_modules for Conv2d layers."""

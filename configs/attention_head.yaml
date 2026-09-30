@@ -1,0 +1,16 @@
+# Requires a YOLOv5 checkpoint containing C3TR modules. Plain yolov5s has no
+# adapter-approved attention targets and fails explicitly instead of guessing.
+model:
+  name: yolov5
+  weights: yolov5s-c3tr.pt
+  device: cuda
+pruning:
+  pruner: attention_head
+  criterion: magnitude
+  granularity: head
+  amount: 0.25
+benchmark:
+  enabled: false
+export:
+  enabled: false
+output_path: weights/yolov5s-c3tr-head-pruned.pt

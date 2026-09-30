@@ -267,6 +267,9 @@ class UnifiedPruningPipeline:
             "global_pruning": cfg.pruning.global_pruning,
             "iterative_steps": cfg.pruning.iterative_steps,
             "min_channels": cfg.pruning.min_channels,
+            "n": cfg.pruning.n,
+            "m": cfg.pruning.m,
+            "block_size": cfg.pruning.block_size,
         }
         if cfg.regularization.enabled and cfg.regularization.term == "l0_hard_concrete":
             gate_indices = regularization.prune_indices(

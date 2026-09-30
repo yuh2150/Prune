@@ -137,12 +137,13 @@ class TestL1Regularization(unittest.TestCase):
         optimizer.step()
         controller.advance(3)
 
-        with tempfile.NamedTemporaryFile(suffix=".pt") as handle:
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/checkpoint.pt"
             torch.save(
                 {"model": self.model.state_dict(), "optimizer": optimizer.state_dict(), "regularization": controller.state_dict()},
-                handle.name,
+                path,
             )
-            checkpoint = torch.load(handle.name, weights_only=True)
+            checkpoint = torch.load(path, weights_only=True)
         restored = ConvBNDetector()
         restored.load_state_dict(checkpoint["model"])
         restored_adapter = YOLOv5Adapter(restored)

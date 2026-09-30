@@ -21,6 +21,7 @@ class TargetType(str, Enum):
     CONV_OUT_CHANNEL = "conv_out_channel"
     LINEAR_WEIGHT = "linear_weight"
     LINEAR_OUT_FEATURE = "linear_out_feature"
+    ATTENTION_HEAD = "attention_head"
 
 
 _EXPECTED_MODULES = {
@@ -64,6 +65,18 @@ class PrunableTarget:
         return None
 
     def describe(self) -> Dict[str, Any]:
+        def describe_dependency(dependency: Dict[str, Any]) -> Dict[str, Any]:
+            described = {}
+            for key, value in dependency.items():
+                if hasattr(value, "shape") and hasattr(value, "numel"):
+                    described[key] = {
+                        "shape": list(value.shape),
+                        "zeros": int((value == 0).sum().item()),
+                        "elements": int(value.numel()),
+                    }
+                else:
+                    described[key] = value
+            return described
         return {
             "name": self.name,
             "target_type": self.target_type.value,
@@ -136,6 +149,31 @@ class StructuralBlockTarget:
         }
 
 
+@dataclass(frozen=True)
+class AttentionHeadTarget:
+    """Adapter-approved ``nn.MultiheadAttention`` whose heads may be compacted.
+
+    The owner information deliberately stays with the adapter: replacing an
+    attention module is only safe when the adapter explicitly exposes it.
+    """
+    name: str
+    module: nn.MultiheadAttention = field(repr=False, compare=False)
+    owner: nn.Module = field(repr=False, compare=False)
+    attribute: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict, compare=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.module, nn.MultiheadAttention):
+            raise TypeError("AttentionHeadTarget requires nn.MultiheadAttention.")
+        if not self.attribute:
+            raise ValueError("AttentionHeadTarget requires its owner attribute name.")
+
+    def describe(self) -> Dict[str, Any]:
+        return {"name": self.name, "target_type": TargetType.ATTENTION_HEAD.value,
+                "module_type": type(self.module).__name__, "num_heads": self.module.num_heads,
+                "embed_dim": self.module.embed_dim, "metadata": dict(self.metadata)}
+
+
 @dataclass
 class PruningGroup:
     """A primary target and the model targets coupled to its mutation.
@@ -146,8 +184,8 @@ class PruningGroup:
     any structural mutation.
     """
 
-    primary: PrunableTarget | StructuralBlockTarget
-    related_targets: List[PrunableTarget | StructuralBlockTarget] = field(default_factory=list)
+    primary: PrunableTarget | StructuralBlockTarget | AttentionHeadTarget
+    related_targets: List[PrunableTarget | StructuralBlockTarget | AttentionHeadTarget] = field(default_factory=list)
     operation: str = "mask_weight"
     indices: List[int] = field(default_factory=list)
     dependencies: List[Dict[str, Any]] = field(default_factory=list)
@@ -161,7 +199,7 @@ class PruningGroup:
             "related_targets": [target.describe() for target in self.related_targets],
             "operation": self.operation,
             "indices": list(self.indices),
-            "dependencies": [dict(dependency) for dependency in self.dependencies],
+            "dependencies": [describe_dependency(dependency) for dependency in self.dependencies],
             "dependency_count": self.dependency_count,
             "validated": self.validated,
             "validation_error": self.validation_error,

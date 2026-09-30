@@ -102,9 +102,10 @@ class TestP0PruningFoundation(unittest.TestCase):
             self.assertTrue(torch.equal(MaskManager.original_weight(module)[mask == 0], torch.zeros_like(MaskManager.original_weight(module)[mask == 0])))
             self.assertTrue(torch.equal(module.weight[mask == 0], torch.zeros_like(module.weight[mask == 0])))
 
-        with tempfile.NamedTemporaryFile(suffix=".pt") as handle:
-            torch.save({"model": self.model.state_dict(), "masks": MaskManager.state_dict(self.model)}, handle.name)
-            checkpoint = torch.load(handle.name, weights_only=True)
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/checkpoint.pt"
+            torch.save({"model": self.model.state_dict(), "masks": MaskManager.state_dict(self.model)}, path)
+            checkpoint = torch.load(path, weights_only=True)
             restored = ConvLinearFixture()
             MaskManager.load_state_dict(restored, checkpoint["masks"])
             restored.load_state_dict(checkpoint["model"])

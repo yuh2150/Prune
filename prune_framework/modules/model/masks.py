@@ -46,7 +46,10 @@ class MaskManager:
             original = module.parametrizations.weight.original
             # Optimizers normally see ``original``. The hook prevents ordinary
             # gradient updates from reviving masked elements between steps.
-            original.register_hook(lambda grad, owner=module: grad * cls.mask(owner))
+            # Frozen detector parameters do not accept autograd hooks. They
+            # still receive persistent masking and post-step enforcement.
+            if original.requires_grad:
+                original.register_hook(lambda grad, owner=module: grad * cls.mask(owner))
         cls.enforce_module(module)
 
     @classmethod

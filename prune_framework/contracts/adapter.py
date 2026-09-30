@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from typing import Callable, Dict, Iterable, List, Tuple, Optional, Any, Set
 
-from .targets import ChannelSparsityTarget, PrunableTarget, StructuralBlockTarget, TargetType
+from .targets import AttentionHeadTarget, ChannelSparsityTarget, PrunableTarget, StructuralBlockTarget, TargetType
 
 
 class BaseModelAdapter(ABC):
@@ -141,6 +141,14 @@ class BaseModelAdapter(ABC):
 
         Empty by default: structural deletion is unsafe unless an adapter also
         implements validation, removal and repair hooks below.
+        """
+        return []
+
+    def get_attention_head_targets(self) -> List[AttentionHeadTarget]:
+        """Return only attention modules whose owner can safely be repaired.
+
+        Empty by default: discovering arbitrary attention modules by name is
+        unsafe for residual and model-config invariants.
         """
         return []
 

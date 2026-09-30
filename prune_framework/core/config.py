@@ -36,6 +36,9 @@ class PruningConfig:
     calibration_batch_size: int = 1
     calibration_seed: int = 42
     calibration_accumulate: bool = True
+    n: Optional[int] = None
+    m: Optional[int] = None
+    block_size: Optional[List[int]] = None
 
     @property
     def method(self) -> str:
@@ -168,6 +171,11 @@ class FrameworkConfig:
             raise ConfigValidationException("pruning.calibration_batches must be at least 1.")
         if self.pruning.calibration_batch_size < 1:
             raise ConfigValidationException("pruning.calibration_batch_size must be at least 1.")
+        if self.pruning.pruner.lower() in {"nm_sparsity", "n_sparsity"}:
+            if not isinstance(self.pruning.n, int) or not isinstance(self.pruning.m, int) or not 0 < self.pruning.n <= self.pruning.m:
+                raise ConfigValidationException("N:M sparsity requires integer pruning.n and pruning.m with 0 < n <= m.")
+        if self.pruning.pruner.lower() == "block_sparse" and (not self.pruning.block_size or len(self.pruning.block_size) != 2 or any(not isinstance(v, int) or v < 1 for v in self.pruning.block_size)):
+            raise ConfigValidationException("block_sparse requires pruning.block_size: [positive_rows, positive_columns].")
         if self.recovery.enabled and self.recovery.epochs < 1:
             raise ConfigValidationException("recovery.epochs must be at least 1 when recovery is enabled.")
         if self.regularization.strength < 0:
