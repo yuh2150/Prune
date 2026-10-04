@@ -23,6 +23,7 @@ class CalibrationResult:
     losses: List[float] = field(default_factory=list)
     batches: int = 0
     accumulated: bool = True
+    aggregation: str = "signed_mean"
 
     def context_for(self, target: PrunableTarget) -> Dict[str, torch.Tensor]:
         try:
@@ -34,6 +35,7 @@ class CalibrationResult:
         return {
             "batches": self.batches,
             "accumulated": self.accumulated,
+            "aggregation": self.aggregation,
             "mean_loss": sum(self.losses) / len(self.losses) if self.losses else None,
             "targets": {name: list(gradient.shape) for name, gradient in self.gradients.items()},
         }
@@ -69,9 +71,12 @@ class GradientCalibrationRunner:
     detached gradients rather than relying on residual ``parameter.grad``.
     """
 
-    def __init__(self, *, seed: int = 42, accumulate: bool = True):
+    def __init__(self, *, seed: int = 42, accumulate: bool = True, aggregation: str = "signed_mean"):
         self.seed = int(seed)
         self.accumulate = bool(accumulate)
+        if aggregation not in {"signed_mean", "abs_mean"}:
+            raise ValueError("Gradient aggregation must be 'signed_mean' or 'abs_mean'.")
+        self.aggregation = aggregation
 
     def run(
         self,
@@ -97,7 +102,9 @@ class GradientCalibrationRunner:
         python_state = random.getstate()
         torch_state = torch.random.get_rng_state()
         cuda_states = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
-        result = CalibrationResult(batches=len(batch_list), accumulated=self.accumulate)
+        result = CalibrationResult(
+            batches=len(batch_list), accumulated=self.accumulate, aggregation=self.aggregation
+        )
 
         try:
             random.seed(self.seed)
@@ -112,24 +119,27 @@ class GradientCalibrationRunner:
                 parameter.requires_grad_(True)
             model.zero_grad(set_to_none=True)
             collected: Dict[str, torch.Tensor] = {}
-            # Both modes return the mean gradient across batches. ``accumulate``
-            # only controls whether PyTorch retains gradients between backward
-            # calls or the runner sums detached per-batch gradients.
+            # ``signed_mean`` preserves the established SNIP semantics:
+            # abs(W * mean(gradient)). ``abs_mean`` is an explicit variant
+            # using mean(abs(gradient)); it must collect each batch before
+            # signed gradients can cancel.
             scale = float(len(batch_list))
-            for batch in batch_list:
-                if not self.accumulate:
+            if self.aggregation == "abs_mean":
+                for batch in batch_list:
                     model.zero_grad(set_to_none=True)
-                loss = loss_fn(model, batch)
-                if not isinstance(loss, torch.Tensor) or loss.numel() != 1:
-                    raise TypeError("Calibration loss_fn must return a scalar or single-element torch.Tensor.")
-                loss = loss.reshape(())
-                result.losses.append(float(loss.detach().cpu()))
-                (loss / scale).backward()
-                if not self.accumulate:
+                    loss = self._loss(loss_fn, model, batch, result)
+                    (loss / scale).backward()
+                    self._add_target_gradients(collected, targets, absolute=True)
+            else:
+                for batch in batch_list:
+                    if not self.accumulate:
+                        model.zero_grad(set_to_none=True)
+                    loss = self._loss(loss_fn, model, batch, result)
+                    (loss / scale).backward()
+                    if not self.accumulate:
+                        self._add_target_gradients(collected, targets)
+                if self.accumulate:
                     self._add_target_gradients(collected, targets)
-
-            if self.accumulate:
-                self._add_target_gradients(collected, targets)
             result.gradients = collected
             return result
         finally:
@@ -155,14 +165,23 @@ class GradientCalibrationRunner:
                 torch.cuda.set_rng_state_all(cuda_states)
 
     @staticmethod
+    def _loss(loss_fn: LossFunction, model: nn.Module, batch: Any, result: CalibrationResult) -> torch.Tensor:
+        loss = loss_fn(model, batch)
+        if not isinstance(loss, torch.Tensor) or loss.numel() != 1:
+            raise TypeError("Calibration loss_fn must return a scalar or single-element torch.Tensor.")
+        loss = loss.reshape(())
+        result.losses.append(float(loss.detach().cpu()))
+        return loss
+
+    @staticmethod
     def _add_target_gradients(
-        collected: Dict[str, torch.Tensor], targets: Sequence[PrunableTarget]
+        collected: Dict[str, torch.Tensor], targets: Sequence[PrunableTarget], *, absolute: bool = False
     ) -> None:
         for target in targets:
             gradient = target.module.weight.grad
             if gradient is None:
                 raise RuntimeError(f"Calibration produced no gradient for target '{target.name}'.")
-            value = gradient.detach().clone()
+            value = gradient.detach().abs().clone() if absolute else gradient.detach().clone()
             collected[target.name] = value if target.name not in collected else collected[target.name] + value
 
 

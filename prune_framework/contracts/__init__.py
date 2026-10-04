@@ -29,6 +29,7 @@ __all__ = [
     "AttentionHeadTarget",
     "ChannelSparsityTarget",
     "StructuralBlockTarget",
+    "AttentionHeadTarget",
     "PruningGroup",
     "PruningPlan",
     "TargetType",

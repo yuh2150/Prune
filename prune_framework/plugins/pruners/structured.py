@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch.nn as nn
 import torch_pruning as tp
@@ -13,6 +14,9 @@ from .structural_operations import STRUCTURAL_OPERATIONS, StructuralOperation, g
 @register_pruner("structured")
 @register_pruner("structured_channel")
 class StructuredPruner(BasePruner):
+    pruning_mode = 'structured'
+    supports_layerwise_policy = True
+
     """Dependency-graph validated structural output-dimension pruning.
 
     Every physical mutation is selected from :mod:`structural_operations` by
@@ -24,11 +28,17 @@ class StructuredPruner(BasePruner):
     def create_plan(self, model_adapter: BaseModelAdapter, criterion: BaseImportanceCriterion,
                     granularity: BaseGranularity = None, config: Dict[str, Any] = None) -> PruningPlan:
         config = config or {}
+        self.validate_config(criterion, config)
         targets = self._structural_targets(model_adapter, criterion)
+        if getattr(granularity, "conv_only", False):
+            targets = [target for target in targets if isinstance(target.module, nn.Conv2d)]
         pruning_params = config.get("pruning_params", config.get("amount", 0.3))
         min_features = int(config.get("min_features", config.get("min_channels", 2)))
         forced_indices = config.get("forced_channel_indices", {}) or {}
         forced_indices = {**forced_indices, **(config.get("forced_structural_indices", {}) or {})}
+        unknown = set(forced_indices) - {target.name for target in targets}
+        if unknown:
+            raise ValueError(f"Unknown or protected structural targets: {sorted(unknown)}")
         use_forced_indices = "forced_channel_indices" in config
         use_forced_indices = use_forced_indices or "forced_structural_indices" in config
         plan = PruningPlan(
@@ -47,7 +57,7 @@ class StructuredPruner(BasePruner):
             selections = [
                 (index, 0.0) for index, target in enumerate(targets) if target.name in forced_indices
             ]
-        elif config.get("global_pruning", False) and isinstance(pruning_params, float):
+        elif config.get("global_pruning", False) and isinstance(pruning_params, (int, float)):
             candidates: List[Tuple[float, int, int]] = []
             caps: Dict[int, int] = {}
             total = 0
@@ -66,14 +76,14 @@ class StructuredPruner(BasePruner):
                 global_indices.setdefault(index, []).append(channel)
                 selected[index] += 1
             selections = [(index, 0.0) for index in sorted(global_indices)]
-        elif isinstance(pruning_params, float):
+        elif isinstance(pruning_params, (int, float)):
             selections = [(index, pruning_params) for index in range(len(targets))]
         else:
             selections = list(pruning_params or [])
 
         for target_index, rate in sorted(selections, key=lambda value: value[0]):
             if target_index < 0 or target_index >= len(targets):
-                continue
+                raise ValueError(f"Invalid layer index: {target_index}")
             target = targets[target_index]
             if target.name in forced_indices:
                 indices = [int(index) for index in forced_indices[target.name]]
@@ -115,6 +125,8 @@ class StructuredPruner(BasePruner):
                     )
                     all_valid = False
                     continue
+                if action.operation != operation.plan_operation:
+                    raise ValueError(f"Unsupported action: {action.operation}")
                 output_size = self._output_size(action.primary)
                 if not action.indices or min(action.indices) < 0 or max(action.indices) >= output_size:
                     action.validated = False
@@ -125,6 +137,7 @@ class StructuredPruner(BasePruner):
                 group = dependency_graph.get_pruning_group(
                     action.primary.module, operation.pruning_fn, action.indices
                 )
+                self._check_protected(group, model_adapter)
                 action.dependency_count = len(group)
                 action.dependencies = self._describe_dependencies(group, model_adapter.model)
                 action.validated = bool(dependency_graph.check_pruning_group(group))
@@ -135,6 +148,34 @@ class StructuredPruner(BasePruner):
                 action.validated = False
                 action.validation_error = str(exc)
                 all_valid = False
+        if all_valid:
+            try:
+                clone_adapter, clone_plan = copy.deepcopy((model_adapter, plan))
+                clone = clone_adapter.model
+                # Gate hooks are train-time state, removed at the physical-mutation
+                # boundary. Remove only those hooks on the shadow model as well.
+                from prune_framework.modules.regularization import HardConcreteChannelGate
+                for module in list(clone.modules()):
+                    if hasattr(module, '_prune_hard_concrete_gate'):
+                        for key, hook in list(module._forward_hooks.items()):
+                            if any(isinstance(default, HardConcreteChannelGate) for default in (getattr(hook, '__defaults__', None) or ())):
+                                del module._forward_hooks[key]
+                        delattr(module, '_prune_hard_concrete_gate')
+                # Prove the entire ordered sequence, including overlap remapping,
+                # on an architecture-preserving clone before touching the caller.
+                self.apply_plan(clone_plan, clone_adapter, {**(config or {}), "l0_gate_controller": None})
+                clone.eval()
+                with torch.no_grad():
+                    clone(clone_adapter.get_dummy_input(next(clone.parameters()).device))
+                plan.metadata["weight_shapes"] = {
+                    name: list(module.weight.shape) for name, module in model_adapter.model.named_modules()
+                    if isinstance(module, (nn.Conv2d, nn.Linear, nn.BatchNorm2d)) and module.weight is not None
+                }
+            except Exception as exc:
+                for action in plan.groups:
+                    action.validated = False
+                    action.validation_error = f"Sequential plan validation failed: {exc}"
+                return False
         return all_valid
 
     def apply_plan(self, plan: PruningPlan, model_adapter: BaseModelAdapter,
@@ -142,6 +183,14 @@ class StructuredPruner(BasePruner):
         if any(not action.validated for action in plan.groups):
             invalid = next(action.primary.name for action in plan.groups if not action.validated)
             raise RuntimeError(f"Cannot apply unvalidated structured action for {invalid}.")
+        expected = plan.metadata.get("weight_shapes")
+        actual = {name: list(module.weight.shape) for name, module in model_adapter.model.named_modules()
+                  if isinstance(module, (nn.Conv2d, nn.Linear, nn.BatchNorm2d)) and module.weight is not None}
+        if expected is not None and expected != actual:
+            raise RuntimeError('Model shapes changed since plan validation; rebuild the plan')
+        mappings = {id(module): list(range(module.weight.shape[0]))
+                    for module in model_adapter.model.modules()
+                    if isinstance(module, (nn.Conv2d, nn.Linear, nn.BatchNorm2d)) and module.weight is not None}
         gate_controller = (config or {}).get("l0_gate_controller")
         if gate_controller is not None:
             # Gate hooks must remain live through dependency validation so the
@@ -150,21 +199,51 @@ class StructuredPruner(BasePruner):
         for action in plan.groups:
             # A dependency graph becomes stale after every structural mutation.
             operation = self._operation_for(action.primary)
+            if operation is not None and action.operation != operation.plan_operation:
+                raise ValueError(f"Unsupported action: {action.operation}")
             if operation is None:
                 raise RuntimeError(f"No structural operation is registered for {action.primary.target_type.value}.")
             dependency_graph = self._build_dependency_graph(model_adapter)
+            mapping = mappings[id(action.primary.module)]
+            indices = [index for index, original in enumerate(mapping) if original in action.indices]
+            if not indices:
+                continue  # already removed by a coupled earlier action
             group = dependency_graph.get_pruning_group(
-                action.primary.module, operation.pruning_fn, action.indices
+                action.primary.module, operation.pruning_fn, indices
             )
+            self._check_protected(group, model_adapter)
             if not dependency_graph.check_pruning_group(group):
                 raise RuntimeError(f"Dependency group became invalid for {action.primary.name}.")
             before = self._output_size(action.primary)
+            removals = {}
+            for item in group.items:
+                module = item.dep.target.module
+                if id(module) in mappings and self._is_output_operation(item.dep.pruning_fn):
+                    removals.setdefault(id(module), set()).update(int(i) for i in item.idxs)
+            for module_id, removed in removals.items():
+                mappings[module_id] = [original for i, original in enumerate(mappings[module_id]) if i not in removed]
+            action.dependencies = self._describe_dependencies(group, model_adapter.model)
+            action.dependency_count = len(group)
             group.prune()
             print(
                 f" - Structured Pruner: {action.primary.name} pruned {len(action.indices)}/{before} "
                 f"{operation.dimension_name}. New output size={self._output_size(action.primary)}"
             )
         return model_adapter.model
+
+    @staticmethod
+    def _is_output_operation(operation):
+        return operation in (tp.prune_conv_out_channels, tp.prune_linear_out_channels,
+                             tp.prune_batchnorm_out_channels)
+
+    @staticmethod
+    def _check_protected(group, adapter):
+        protected = getattr(adapter, "is_protected_module", lambda name, module: False)
+        names = {id(module): name for name, module in adapter.model.named_modules()}
+        for item in group.items:
+            module = item.dep.target.module
+            if StructuredPruner._is_output_operation(item.dep.pruning_fn) and protected(names.get(id(module), ''), module):
+                raise ValueError(f'Protected output would be pruned: {names.get(id(module))}')
 
     @staticmethod
     def _structural_targets(
@@ -199,7 +278,8 @@ class StructuredPruner(BasePruner):
             context = calibration.context_for(target) if calibration is not None else None
             scores = criterion.score(target.module, context=context)
         else:
-            importance_module = model_adapter.get_importance_module(target.name, target.module)
+            importance_module = (model_adapter.get_importance_module(target.name, target.module)
+                                 if criterion.uses_bn_wrapper else target.module)
             scores = criterion.score(importance_module) if hasattr(criterion, "score") else criterion.compute_scores(importance_module)
         output_size = StructuredPruner._output_size(target)
         if scores.numel() != output_size:
@@ -213,13 +293,17 @@ class StructuredPruner(BasePruner):
     def _build_dependency_graph(model_adapter: BaseModelAdapter) -> tp.DependencyGraph:
         model = model_adapter.model
         device = next(model.parameters()).device
+        modes = [(module, module.training) for module in model.modules()]
         grad_states = {name: parameter.requires_grad for name, parameter in model.named_parameters()}
         try:
+            model.eval()
             for parameter in model.parameters():
                 parameter.requires_grad = True
             with torch.enable_grad():
                 return tp.DependencyGraph().build_dependency(model, model_adapter.get_dummy_input(device))
         finally:
+            for module, training in modes:
+                module.training = training
             for name, parameter in model.named_parameters():
                 parameter.requires_grad = grad_states[name]
 

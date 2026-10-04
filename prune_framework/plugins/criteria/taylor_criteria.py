@@ -9,6 +9,8 @@ from prune_framework.contracts.targets import TargetType
 @register_criterion("taylor")
 @register_criterion("taylor_first_order")
 class TaylorFirstOrderCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['structured'])
+    uses_bn_wrapper = False
     """
     First-Order Taylor Expansion Importance Score:
     Score = |Weight * Gradient| summed over input channels and spatial dimensions.

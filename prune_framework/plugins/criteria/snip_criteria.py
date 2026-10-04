@@ -14,6 +14,8 @@ from prune_framework.core.registry import register_criterion
 
 @register_criterion("snip")
 class SNIPCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['unstructured'])
+    uses_bn_wrapper = False
     """Element-wise SNIP saliency: ``abs(W * dL/dW)``.
 
     This criterion never mutates a module.  The detached calibration gradient

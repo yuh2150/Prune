@@ -15,6 +15,8 @@ from prune_framework.modules.regularization import HardConcreteChannelGate
 @register_criterion("l0_gate")
 @register_criterion("hard_concrete")
 class HardConcreteGateCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['structured'])
+    uses_bn_wrapper = True
     """Score channels by their deterministic Hard-Concrete activation gate."""
 
     def score(self, module: nn.Module, context: Optional[Dict[str, Any]] = None) -> torch.Tensor:

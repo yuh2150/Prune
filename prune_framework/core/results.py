@@ -52,3 +52,13 @@ class ExperimentResult:
     complexity_before: Optional[ComplexityResult] = None
     complexity_after: Optional[ComplexityResult] = None
     artifacts: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class PlanBuildResult:
+    """Planning result. No final-model mutations, recovery or export executed."""
+    plan: Any
+    model: Any
+    baseline_metrics: Optional[Dict[str, float]]
+    policy: Any
+    artifacts: Dict[str, str]

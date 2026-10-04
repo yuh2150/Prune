@@ -17,6 +17,9 @@ from prune_framework.core.registry import register_pruner
 @register_pruner("layer_depth")
 @register_pruner("structural_block")
 class DepthPruner(BasePruner):
+    pruning_mode = 'depth'
+    supports_layerwise_policy = False
+
     """Remove only block targets explicitly declared by an adapter.
 
     The pruner never infers how a model should be rewired. It selects targets,
@@ -33,6 +36,7 @@ class DepthPruner(BasePruner):
     ) -> PruningPlan:
         del granularity
         config = config or {}
+        self.validate_config(criterion, config)
         targets = list(model_adapter.get_structural_block_targets())
         requested = self._select_targets(targets, model_adapter, criterion, config)
         return PruningPlan(
@@ -53,7 +57,7 @@ class DepthPruner(BasePruner):
     ) -> bool:
         del config
         targets = [group.primary for group in plan.groups]
-        if not all(isinstance(target, StructuralBlockTarget) for target in targets):
+        if not all(isinstance(target, StructuralBlockTarget) for target in targets) or any(group.operation != "remove_structural_block" for group in plan.groups):
             for group in plan.groups:
                 group.validated = False
                 group.validation_error = "Structural block plan contains a non-structural target."

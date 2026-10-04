@@ -1,133 +1,29 @@
-# Production Model Pruning Framework (Modular + Plugin Architecture)
+# Detector Pruning Framework
 
-A plugin-based pruning framework for object-detection research. Registered adapters cover **YOLOv5**, a legacy **YOLOv7 compatibility alias**, and Hugging Face **RT-DETR**. ResNet is not currently implemented as an adapter.
+Framework tổ chức pruning detector bằng adapter, importance criterion, calibration, sensitivity-aware policy và executable pruning plan.
 
-The framework enforces **Zero-Code-Change Core Extensibility** using a clean composition of four orthogonal plugin abstractions:
-
-$$\text{Pruner (Plugin)} + \text{Criterion (Plugin)} + \text{Granularity (Plugin)} + \text{ModelAdapter (Plugin)}$$
-
----
-
-## 🌟 Architecture Overview
+**Tài liệu chính: [Pruning Framework](docs/pruning.md).**
 
 ```text
-prune_framework/
-├── core/
-│   ├── registry.py            # Central PluginRegistry with decorator discovery
-│   ├── interfaces.py          # Abstract Base Classes (BasePruner, BaseCriterion, etc.)
-│   ├── engine.py              # Pure Orchestrator & Forward Verification
-│   ├── config.py              # Configuration manager & YAML loader
-│   ├── results.py             # Standardized result dataclasses
-│   └── exceptions.py          # Framework exception hierarchy
-├── modules/
-│   ├── analysis/              # Sensitivity, Layer Selection, Importance Scorer
-│   ├── evaluation/            # Metrics, Decoupled Benchmark, Validator
-│   ├── model/                 # Model Loader & Inspector
-│   ├── export/                # ONNX and Checkpoint Exporters
-│   └── utils/                 # Logging & Profiling utilities
-├── plugins/
-│   ├── pruners/               # structured, unstructured, depth
-│   ├── criteria/              # l1, l2, magnitude, bn_gamma, taylor, lamp, random
-│   ├── granularities/         # weight, channel, filter, block, head, layer
-│   ├── adapters/              # yolov5, rtdetr
-│   └── selectors/             # sensitivity, greedy
-├── pipelines/
-│   ├── unified.py             # Reproducible, stage-based experiment workflow
-│   ├── pruning.py             # Backwards-compatible pruning entry point
-│   ├── sensitivity.py         # End-to-end Sensitivity Analysis
-│   └── benchmarking.py        # End-to-end Decoupled Latency Benchmark
-├── configs/                   # Production YAML templates
-└── main.py                    # Unified CLI Entry Point
+Model → Baseline snapshot/evaluation → Compatibility → Calibration
+→ Sensitivity → Policy → Build/validate plan → Apply → Recovery
+→ Evaluation/measurement → Deployment target check → Finalize
 ```
 
----
+Contracts và mechanisms đã **Implemented**; orchestration, evaluator và dependency safety đã **Validated** bằng unit/tiny/mock/synthetic tests. YOLOv5 recovery fine-tune callback có test CPU với data/loss injectable; full detector end-to-end pruning chưa **Experimentally validated** trong unified flow hiện tại.
 
-## 🚀 Quickstart & Usage
-
-### 1. Dynamic Listing Commands
-Inspect registered plugins dynamically via `main.py`:
+Từ repository root, trong môi trường project:
 
 ```bash
-# List registered model adapters
-python main.py --list-models
-
-# List registered pruning strategies
-python main.py --list-pruners
-
-# List registered importance criteria
-python main.py --list-criteria
-
-# List registered granularities
-python main.py --list-granularities
+python main.py --config configs/research_unified.yaml --dry-run
 ```
 
----
-
-### 2. Configuration-Driven Pruning Execution
-
-Execute pruning using YAML configuration files:
+Dry-run kiểm tra config/mô tả flow, không load model hoặc data. Để chuẩn bị và validate plan:
 
 ```bash
-# Structured Channel Pruning on YOLOv5
-python main.py --config configs/yolov5_structured.yaml
-
-# Unstructured Weight Sparsity on YOLOv5
-python main.py --config configs/yolov5_unstructured.yaml
-
-# Transformer Depth Pruning on RT-DETR
-python main.py --config configs/rtdetr_structured.yaml
+python main.py --config configs/research_unified.yaml --build-plan-only
 ```
 
-For a full experiment protocol—baseline and final evaluation, sensitivity,
-recovery, complexity measurements and artifacts—start from
-[`configs/research_unified.yaml`](configs/research_unified.yaml). Dataset-specific
-evaluation and recovery are supplied as callbacks so the core does not hard-code
-a detector or training loop.
+Build-plan-only có thể load model, chạy calibration, sensitivity/evaluation và graph validation; cần checkpoint/data phù hợp và có thể tốn compute. Nó dừng trước final apply/recovery/export. Config mẫu chưa phải recipe cho experiment đầy đủ.
 
----
-
-### 3. Command Line Parameter Overrides
-
-Override YAML options directly from the command line:
-
-```bash
-python main.py \
-  --model yolov5 \
-  --strategy structured \
-  --criterion l1 \
-  --granularity channel \
-  --weights weights/yolov5s.pt \
-  --amount 0.35 \
-  --output-path pruned_yolov5s.pt
-```
-
----
-
-## 🔌 Adding a New Plugin (Zero-Code-Change Core)
-
-To add a new importance criterion (e.g. `CustomCosine`), create a single file `prune_framework/plugins/criteria/custom.py`:
-
-```python
-import torch
-import torch.nn as nn
-from prune_framework.core.interfaces import BaseImportanceCriterion
-from prune_framework.core.registry import register_criterion
-
-@register_criterion("custom_cosine")
-class CustomCosineCriterion(BaseImportanceCriterion):
-    def score(self, module: nn.Module, context=None) -> torch.Tensor:
-        # Calculate custom importance scores
-        return torch.norm(module.weight.data, p=2, dim=[1, 2, 3])
-```
-
-That's it! Use `criterion: custom_cosine` in your YAML configuration or CLI flags immediately without modifying any core engine or registry code.
-
----
-
-## 🧪 Running Framework Test Suite
-
-Run unit and integration tests using Python's native test runner:
-
-```bash
-conda run -n env_cv python -m unittest discover -s tests
-```
+Xem [docs index](docs/README.md), [engineering contracts](docs/architecture/pruning-contracts.md) và [historical results](REPORT.md). Kết quả lịch sử chưa được revalidate bằng unified flow hiện tại.

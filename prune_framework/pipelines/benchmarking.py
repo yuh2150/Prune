@@ -7,7 +7,12 @@ from prune_framework.modules.evaluation.benchmark import LatencyBenchmark
 
 def run_benchmarking_pipeline(config: FrameworkConfig, post_process_fn=None):
     device = torch.device(config.model.device if torch.cuda.is_available() else "cpu")
-    model, _ = ModelLoader.load(config.model.name, config.model.weights, device)
+    model, _ = ModelLoader.load(
+        config.model.name,
+        config.model.weights,
+        device,
+        **({"num_classes": config.model.num_classes} if config.model.num_classes is not None else {}),
+    )
 
     adapter_cls = PluginRegistry.get_model_adapter(config.model.name)
     adapter = adapter_cls(model)

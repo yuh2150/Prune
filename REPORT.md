@@ -1,3 +1,11 @@
+# Historical Results / Legacy Documentation
+
+> These results were produced by an earlier pipeline and have not yet been revalidated against the current unified pruning flow.
+>
+> Nội dung bên dưới được giữ để truy xuất lịch sử. Commands, API, capability claims và số liệu không phải hướng dẫn hoặc validation cho code hiện tại. Xem [Pruning Framework](docs/pruning.md).
+
+---
+
 # Báo Cáo: Structured Channel Pruning trên YOLOv5s
 
 > **Model:** YOLOv5s &nbsp;|&nbsp; **Dataset:** COCO 2017 (val) &nbsp;|&nbsp; **Phương pháp:** Structured Filter/Channel Pruning  

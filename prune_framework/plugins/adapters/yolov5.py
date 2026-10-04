@@ -26,14 +26,22 @@ class YOLOv5Adapter(BaseModelAdapter):
         pruneable = []
         for name, module in self.model.named_modules():
             if isinstance(module, nn.Conv2d):
-                if self._is_protected_name(name):
+                if self.is_protected_module(name, module):
                     continue
                 pruneable.append((name, module))
         return pruneable
 
+    def is_protected_module(self, name, module):
+        if self._is_protected_name(name):
+            return True
+        modules = dict(self.model.named_modules())
+        parts = name.split('.')
+        return any(type(modules.get('.'.join(parts[:end]))).__name__.lower() in {'detect', 'segment'}
+                   for end in range(1, len(parts) + 1))
+
     @staticmethod
     def _is_protected_name(name: str) -> bool:
-        return any(head in name.lower() for head in ["detect", "segment", "anchor", "m.0", "m.1", "m.2"])
+        return any(head in name.lower() for head in ["detect", "segment", "anchor"])
 
     def supported_target_types(self) -> Set[TargetType]:
         """YOLO exposes Conv and non-head Linear weights in the P0 target API.
@@ -54,7 +62,7 @@ class YOLOv5Adapter(BaseModelAdapter):
         allowed &= self.supported_target_types()
         targets: List[PrunableTarget] = []
         for name, module in self.model.named_modules():
-            if self._is_protected_name(name):
+            if self.is_protected_module(name, module):
                 continue
             if isinstance(module, nn.Conv2d):
                 if TargetType.CONV_WEIGHT in allowed:

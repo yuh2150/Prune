@@ -14,6 +14,8 @@ from prune_framework.core.registry import register_criterion
 
 @register_criterion("synflow")
 class SynFlowCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['unstructured'])
+    uses_bn_wrapper = False
     """Element-wise SynFlow saliency: ``abs(W * d(sum(output))/dW)``."""
 
     requires_synflow_calibration = True

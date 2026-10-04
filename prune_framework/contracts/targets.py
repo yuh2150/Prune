@@ -151,27 +151,30 @@ class StructuralBlockTarget:
 
 @dataclass(frozen=True)
 class AttentionHeadTarget:
-    """Adapter-approved ``nn.MultiheadAttention`` whose heads may be compacted.
+    """An adapter-declared multi-head-attention module with explicit layout."""
 
-    The owner information deliberately stays with the adapter: replacing an
-    attention module is only safe when the adapter explicitly exposes it.
-    """
     name: str
-    module: nn.MultiheadAttention = field(repr=False, compare=False)
-    owner: nn.Module = field(repr=False, compare=False)
-    attribute: str = ""
+    module: nn.Module = field(repr=False, compare=False)
+    num_heads: int = 0
+    head_dim: int = 0
+    layout: str = "separate_qkv"
     metadata: Dict[str, Any] = field(default_factory=dict, compare=False)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.module, nn.MultiheadAttention):
-            raise TypeError("AttentionHeadTarget requires nn.MultiheadAttention.")
-        if not self.attribute:
-            raise ValueError("AttentionHeadTarget requires its owner attribute name.")
+        if self.num_heads < 2 or self.head_dim < 1:
+            raise ValueError("Attention head targets require at least two heads and a positive head dimension.")
+        if self.layout not in {"separate_qkv", "fused_qkv"}:
+            raise ValueError(f"Unsupported attention-head layout '{self.layout}'.")
 
     def describe(self) -> Dict[str, Any]:
-        return {"name": self.name, "target_type": TargetType.ATTENTION_HEAD.value,
-                "module_type": type(self.module).__name__, "num_heads": self.module.num_heads,
-                "embed_dim": self.module.embed_dim, "metadata": dict(self.metadata)}
+        return {
+            "name": self.name,
+            "module_type": type(self.module).__name__,
+            "num_heads": self.num_heads,
+            "head_dim": self.head_dim,
+            "layout": self.layout,
+            "metadata": dict(self.metadata),
+        }
 
 
 @dataclass

@@ -104,8 +104,8 @@ class TestUnifiedPruningPipeline(unittest.TestCase):
                 result = UnifiedPruningPipeline(config, evaluator=evaluator, recovery=recovery).run()
 
             self.assertTrue(result.pruning.forward_verified)
-            self.assertEqual(result.baseline_metrics, {"map": 0.8})
-            self.assertEqual(result.final_metrics, {"map": 0.8})
+            self.assertEqual(result.baseline_metrics, {"map": 0.8, "map50_95": 0.8})
+            self.assertEqual(result.final_metrics, {"map": 0.8, "map50_95": 0.8})
             self.assertEqual(recovered, [1])
             self.assertTrue(Path(result.artifacts["config"]).is_file())
             self.assertTrue(Path(result.artifacts["sensitivity"]).is_file())

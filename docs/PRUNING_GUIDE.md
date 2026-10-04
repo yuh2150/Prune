@@ -1,3 +1,11 @@
+# Historical Results / Legacy Documentation
+
+> These results were produced by an earlier pipeline and have not yet been revalidated against the current unified pruning flow.
+>
+> Nội dung bên dưới được giữ để truy xuất lịch sử. Commands, API, capability claims và số liệu không phải hướng dẫn hoặc validation cho code hiện tại. Xem [Pruning Framework](pruning.md).
+
+---
+
 # Hướng dẫn chi tiết: Framework Model Pruning & Sensitivity Analysis (YOLOv5 & RT-DETR)
 
 Tài liệu này cung cấp cái nhìn chi tiết và toàn diện về hệ thống nén mô hình (**Model Pruning**) trong dự án **Prune**. Framework này hỗ trợ cả hai dòng kiến trúc phát hiện vật thể phổ biến: **YOLOv5** (Anchor-based CNN) và **RT-DETR** (Transformer-based Detector).

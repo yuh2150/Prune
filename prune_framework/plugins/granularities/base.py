@@ -22,16 +22,28 @@ class ChannelGranularity(BaseGranularity):
 
 @register_granularity("filter")
 class FilterGranularity(BaseGranularity):
-    """Filter-level granularity for 2D Conv filter pruning."""
+    """Conv2d output-filter granularity.
+
+    A filter is ``weight[out_channel, ...]``.  The structured pruner removes
+    that output channel and lets its dependency graph update bias, consumers
+    and compatible normalisation layers. Grouped/depthwise kernels are
+    rejected until their group-coupled dependency semantics are explicit.
+    """
+
+    conv_only = True
 
     def extract_indices(self, scores: torch.Tensor, prune_ratio: float, module: nn.Module) -> List[int]:
+        if not isinstance(module, nn.Conv2d):
+            raise TypeError("Filter pruning requires a Conv2d output-filter target.")
+        if module.groups != 1:
+            raise ValueError("Filter pruning does not support grouped or depthwise Conv2d modules.")
         total = scores.numel()
         n_prune = int(total * prune_ratio)
         if n_prune >= total:
             n_prune = max(0, total - 1)
         if n_prune <= 0:
             return []
-        return torch.argsort(scores)[:n_prune].tolist()
+        return torch.argsort(scores, stable=True)[:n_prune].tolist()
 
 
 @register_granularity("weight")

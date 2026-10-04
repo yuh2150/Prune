@@ -1,0 +1,37 @@
+# Requires an explicitly pre-downloaded MNIST cache in dataset.root.
+model:
+  name: lenet5
+  weights: random
+  device: cpu
+  input_shape: [1, 1, 28, 28]
+
+dataset:
+  name: mnist
+  root: ./data/mnist
+  batch_size: 64
+  num_workers: 0
+  train_limit: 512
+  val_limit: 256
+
+pruning:
+  method: unstructured
+  criterion: magnitude
+  structure: weight
+  target_ratio: 0.10
+
+evaluation:
+  enabled: true
+  callback: experiments.classification:evaluate
+  metric: accuracy
+
+recovery:
+  enabled: true
+  epochs: 1
+  callback: experiments.classification:recover
+  optimizer: {name: sgd, lr: 0.01}
+
+sensitivity: {enabled: false}
+benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+export: {enabled: false, onnx: false}
+experiment: {name: lenet5_mnist_recovery_smoke, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/lenet5_mnist_recovery_smoke.pt
