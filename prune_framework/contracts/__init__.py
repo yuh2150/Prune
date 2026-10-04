@@ -26,6 +26,7 @@ __all__ = [
     "BaseGranularity",
     "BaseSelector",
     "PrunableTarget",
+    "AttentionHeadTarget",
     "ChannelSparsityTarget",
     "StructuralBlockTarget",
     "AttentionHeadTarget",

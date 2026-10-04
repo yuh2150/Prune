@@ -135,12 +135,15 @@ class TestStructuralBlockPruning(unittest.TestCase):
         self.assertTrue(self.pruner.validate_plan(plan, self.adapter))
         self.pruner.apply_plan(plan, self.adapter)
         images = self.adapter.get_dummy_input(torch.device("cpu"))
-        with tempfile.NamedTemporaryFile(suffix=".pt") as handle:
-            torch.save(self.model, handle.name)
+        # NamedTemporaryFile keeps a Windows handle open and torch.save cannot
+        # reopen that path there.
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/checkpoint.pt"
+            torch.save(self.model, path)
             try:
-                restored = torch.load(handle.name, weights_only=False)
+                restored = torch.load(path, weights_only=False)
             except TypeError:
-                restored = torch.load(handle.name)
+                restored = torch.load(path)
         self.assertTrue(torch.allclose(self.model(images), restored(images)))
         self.assertTrue(ModelValidator.validate_checkpoint_reload(self.model, images))
 

@@ -21,6 +21,7 @@ class TargetType(str, Enum):
     CONV_OUT_CHANNEL = "conv_out_channel"
     LINEAR_WEIGHT = "linear_weight"
     LINEAR_OUT_FEATURE = "linear_out_feature"
+    ATTENTION_HEAD = "attention_head"
 
 
 _EXPECTED_MODULES = {
@@ -64,6 +65,18 @@ class PrunableTarget:
         return None
 
     def describe(self) -> Dict[str, Any]:
+        def describe_dependency(dependency: Dict[str, Any]) -> Dict[str, Any]:
+            described = {}
+            for key, value in dependency.items():
+                if hasattr(value, "shape") and hasattr(value, "numel"):
+                    described[key] = {
+                        "shape": list(value.shape),
+                        "zeros": int((value == 0).sum().item()),
+                        "elements": int(value.numel()),
+                    }
+                else:
+                    described[key] = value
+            return described
         return {
             "name": self.name,
             "target_type": self.target_type.value,
@@ -189,7 +202,7 @@ class PruningGroup:
             "related_targets": [target.describe() for target in self.related_targets],
             "operation": self.operation,
             "indices": list(self.indices),
-            "dependencies": [dict(dependency) for dependency in self.dependencies],
+            "dependencies": [describe_dependency(dependency) for dependency in self.dependencies],
             "dependency_count": self.dependency_count,
             "validated": self.validated,
             "validation_error": self.validation_error,

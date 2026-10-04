@@ -1,0 +1,17 @@
+model:
+  name: yolov5
+  weights: weights/yolov5s.pt
+  device: cuda
+pruning:
+  pruner: block_sparse
+  criterion: magnitude
+  granularity: weight
+  block_size: [4, 4]
+  amount: 0.5
+benchmark:
+  enabled: true # Dense fallback: latency is not sparse-kernel acceleration.
+  runs: 30
+  warmup: 10
+export:
+  enabled: false
+output_path: weights/yolov5s-block-sparse.pt

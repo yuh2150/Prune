@@ -1,0 +1,18 @@
+model:
+  name: yolov5
+  weights: weights/yolov5s.pt
+  device: cuda
+pruning:
+  pruner: nm_sparsity
+  criterion: magnitude
+  granularity: weight
+  n: 2
+  m: 4
+  amount: 0.5 # Ignored by N:M selection; exactly N of every M are retained.
+benchmark:
+  enabled: true # Dense fallback: latency is not sparse-kernel acceleration.
+  runs: 30
+  warmup: 10
+export:
+  enabled: false
+output_path: weights/yolov5s-nm-2of4.pt
