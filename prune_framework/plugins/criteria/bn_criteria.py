@@ -8,6 +8,8 @@ from prune_framework.core.registry import register_criterion
 @register_criterion("bn_scale")
 @register_criterion("bn_gamma")
 class BNScaleCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['structured'])
+    uses_bn_wrapper = True
     """
     Network Slimming Criterion based on absolute BatchNorm gamma magnitude (|gamma|).
     """
@@ -25,6 +27,8 @@ class BNScaleCriterion(BaseImportanceCriterion):
 
 @register_criterion("bn_l1_combined")
 class BNL1CombinedCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['structured'])
+    uses_bn_wrapper = True
     """
     Combined criterion multiplying BatchNorm gamma magnitude by Conv L1-norm.
     """

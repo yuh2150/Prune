@@ -1,0 +1,21 @@
+# Safe N:M plan-only smoke config. N means retained non-zero values per M group.
+model:
+  name: yolov5
+  weights: weights/yolov5s.pt
+  device: cuda
+
+pruning:
+  method: nm
+  criterion: magnitude
+  structure: weight
+  n: 2
+  m: 4
+  target_ratio: 0.5
+
+sensitivity: {enabled: false}
+evaluation: {enabled: false}
+recovery: {enabled: false, epochs: 0}
+benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+export: {enabled: false, onnx: false}
+experiment: {name: yolov5_nm_plan_smoke, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/yolov5_nm_plan_smoke.pt

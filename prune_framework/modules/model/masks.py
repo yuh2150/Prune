@@ -40,7 +40,9 @@ class MaskManager:
             )
         mask = mask.to(device=module.weight.device, dtype=module.weight.dtype)
         if cls.has_mask(module):
-            cls._mask_module(module).mask.copy_(mask)
+            # Pruning is monotonic: a later plan may add zeros but cannot
+            # silently revive weights removed by an earlier plan.
+            cls._mask_module(module).mask.mul_(mask)
         else:
             parametrize.register_parametrization(module, "weight", WeightMask(mask))
             original = module.parametrizations.weight.original
@@ -81,6 +83,7 @@ class MaskManager:
         for module in model.modules():
             if isinstance(module, cls._SUPPORTED) and cls.has_mask(module):
                 cls.enforce_module(module)
+        ParameterMaskManager.enforce(model)
 
     @classmethod
     def attach_optimizer(cls, model: nn.Module, optimizer: torch.optim.Optimizer) -> None:
@@ -117,3 +120,93 @@ class MaskManager:
             if isinstance(module, cls._SUPPORTED) and cls.has_mask(module):
                 cls.enforce_module(module)
                 parametrize.remove_parametrizations(module, "weight", leave_parametrized=True)
+        ParameterMaskManager.materialize(model)
+
+
+class ParameterMaskManager:
+    """Persistent masks for explicit non-``weight`` parameters.
+
+    Attention-head masking needs to constrain fused QKV tensors and projection
+    biases as well as ordinary Linear weights.  This manager deliberately uses
+    an explicit parameter name so it cannot accidentally mask arbitrary model
+    state through a broad module scan.
+    """
+
+    @staticmethod
+    def _parametrization(module: nn.Module, parameter_name: str) -> WeightMask:
+        if not hasattr(module, "parametrizations") or parameter_name not in module.parametrizations:
+            raise ValueError(f"{type(module).__name__}.{parameter_name} has no framework parameter mask.")
+        mask = module.parametrizations[parameter_name][0]
+        if not isinstance(mask, WeightMask):
+            raise ValueError(f"{type(module).__name__}.{parameter_name} has an incompatible parametrization.")
+        return mask
+
+    @classmethod
+    def has_mask(cls, module: nn.Module, parameter_name: str) -> bool:
+        return hasattr(module, "parametrizations") and parameter_name in module.parametrizations
+
+    @classmethod
+    def apply(cls, module: nn.Module, parameter_name: str, mask: torch.Tensor) -> None:
+        parameter = getattr(module, parameter_name, None)
+        if not isinstance(parameter, torch.Tensor):
+            raise TypeError(f"{type(module).__name__}.{parameter_name} is not a tensor parameter.")
+        if tuple(mask.shape) != tuple(parameter.shape):
+            raise ValueError(f"Mask shape {tuple(mask.shape)} does not match {parameter_name} shape {tuple(parameter.shape)}.")
+        mask = mask.to(device=parameter.device, dtype=parameter.dtype)
+        if cls.has_mask(module, parameter_name):
+            stored = cls._parametrization(module, parameter_name).mask
+            stored.mul_(mask)
+        else:
+            parametrize.register_parametrization(module, parameter_name, WeightMask(mask))
+            original = module.parametrizations[parameter_name].original
+            original.register_hook(lambda grad, owner=module, name=parameter_name: grad * cls.mask(owner, name))
+        cls.enforce_module(module, parameter_name)
+
+    @classmethod
+    def mask(cls, module: nn.Module, parameter_name: str) -> torch.Tensor:
+        return cls._parametrization(module, parameter_name).mask
+
+    @classmethod
+    def original(cls, module: nn.Module, parameter_name: str) -> torch.nn.Parameter:
+        return module.parametrizations[parameter_name].original if cls.has_mask(module, parameter_name) else getattr(module, parameter_name)
+
+    @classmethod
+    def enforce_module(cls, module: nn.Module, parameter_name: str) -> None:
+        if cls.has_mask(module, parameter_name):
+            with torch.no_grad():
+                cls.original(module, parameter_name).mul_(cls.mask(module, parameter_name))
+
+    @classmethod
+    def enforce(cls, model: nn.Module) -> None:
+        for module in model.modules():
+            for name in getattr(module, "parametrizations", {}):
+                if cls.has_mask(module, name):
+                    cls.enforce_module(module, name)
+
+    @classmethod
+    def state_dict(cls, model: nn.Module) -> Dict[str, torch.Tensor]:
+        return {
+            f"{module_name}:{name}": cls.mask(module, name).detach().cpu().clone()
+            for module_name, module in model.named_modules()
+            for name in getattr(module, "parametrizations", {})
+            if cls.has_mask(module, name)
+        }
+
+    @classmethod
+    def load_state_dict(cls, model: nn.Module, masks: Mapping[str, torch.Tensor]) -> None:
+        modules = dict(model.named_modules())
+        for key, mask in masks.items():
+            if ":" not in key:
+                raise ValueError(f"Invalid parameter-mask key {key!r}.")
+            module_name, parameter_name = key.rsplit(":", 1)
+            if module_name not in modules:
+                raise KeyError(f"Parameter mask references missing module '{module_name}'.")
+            cls.apply(modules[module_name], parameter_name, mask)
+
+    @classmethod
+    def materialize(cls, model: nn.Module) -> None:
+        for module in model.modules():
+            for name in list(getattr(module, "parametrizations", {}).keys()):
+                if cls.has_mask(module, name):
+                    cls.enforce_module(module, name)
+                    parametrize.remove_parametrizations(module, name, leave_parametrized=True)

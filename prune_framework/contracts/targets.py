@@ -136,6 +136,34 @@ class StructuralBlockTarget:
         }
 
 
+@dataclass(frozen=True)
+class AttentionHeadTarget:
+    """An adapter-declared multi-head-attention module with explicit layout."""
+
+    name: str
+    module: nn.Module = field(repr=False, compare=False)
+    num_heads: int = 0
+    head_dim: int = 0
+    layout: str = "separate_qkv"
+    metadata: Dict[str, Any] = field(default_factory=dict, compare=False)
+
+    def __post_init__(self) -> None:
+        if self.num_heads < 2 or self.head_dim < 1:
+            raise ValueError("Attention head targets require at least two heads and a positive head dimension.")
+        if self.layout not in {"separate_qkv", "fused_qkv"}:
+            raise ValueError(f"Unsupported attention-head layout '{self.layout}'.")
+
+    def describe(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "module_type": type(self.module).__name__,
+            "num_heads": self.num_heads,
+            "head_dim": self.head_dim,
+            "layout": self.layout,
+            "metadata": dict(self.metadata),
+        }
+
+
 @dataclass
 class PruningGroup:
     """A primary target and the model targets coupled to its mutation.
@@ -146,8 +174,8 @@ class PruningGroup:
     any structural mutation.
     """
 
-    primary: PrunableTarget | StructuralBlockTarget
-    related_targets: List[PrunableTarget | StructuralBlockTarget] = field(default_factory=list)
+    primary: PrunableTarget | StructuralBlockTarget | AttentionHeadTarget
+    related_targets: List[PrunableTarget | StructuralBlockTarget | AttentionHeadTarget] = field(default_factory=list)
     operation: str = "mask_weight"
     indices: List[int] = field(default_factory=list)
     dependencies: List[Dict[str, Any]] = field(default_factory=list)

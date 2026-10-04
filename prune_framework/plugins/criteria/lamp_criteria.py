@@ -8,6 +8,8 @@ from prune_framework.modules.analysis.importance import LayerAdaptiveMagnitudeNo
 
 @register_criterion("lamp")
 class LAMPCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['unstructured'])
+    uses_bn_wrapper = False
     """
     Canonical element-wise Layer-Adaptive Magnitude Pruning (LAMP) score.
 

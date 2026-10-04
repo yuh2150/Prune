@@ -1,0 +1,20 @@
+# Safe rectangular block-sparse plan-only smoke config.
+model:
+  name: yolov5
+  weights: weights/yolov5s.pt
+  device: cuda
+
+pruning:
+  method: block_sparse
+  criterion: magnitude
+  structure: weight
+  target_ratio: 0.25
+  block_shape: [4, 4]
+
+sensitivity: {enabled: false}
+evaluation: {enabled: false}
+recovery: {enabled: false, epochs: 0}
+benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+export: {enabled: false, onnx: false}
+experiment: {name: yolov5_block_sparse_plan_smoke, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/yolov5_block_sparse_plan_smoke.pt

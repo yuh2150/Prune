@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from typing import Callable, Dict, Iterable, List, Tuple, Optional, Any, Set
 
-from .targets import ChannelSparsityTarget, PrunableTarget, StructuralBlockTarget, TargetType
+from .targets import AttentionHeadTarget, ChannelSparsityTarget, PrunableTarget, StructuralBlockTarget, TargetType
 
 
 class BaseModelAdapter(ABC):
@@ -143,6 +143,68 @@ class BaseModelAdapter(ABC):
         implements validation, removal and repair hooks below.
         """
         return []
+
+    def get_attention_head_targets(self) -> List[AttentionHeadTarget]:
+        """Return only adapter-approved attention modules; default is unsupported."""
+        return []
+
+    def score_attention_heads(self, target: AttentionHeadTarget) -> torch.Tensor:
+        """Magnitude score combining Q/K/V outputs and output-projection inputs."""
+        module, heads, width = target.module, target.num_heads, target.head_dim
+        scores = []
+        if target.layout == "fused_qkv":
+            qkv = module.in_proj_weight.detach().reshape(3, heads, width, -1)
+            scores.extend(qkv.abs().mean(dim=(2, 3)))
+            scores.append(module.out_proj.weight.detach().reshape(-1, heads, width).abs().mean(dim=(0, 2)))
+        else:
+            for name in ("q_proj", "k_proj", "v_proj"):
+                projection = getattr(module, name)
+                scores.append(projection.weight.detach().reshape(heads, width, -1).abs().mean(dim=(1, 2)))
+            scores.append(getattr(module, "o_proj").weight.detach().reshape(-1, heads, width).abs().mean(dim=(0, 2)))
+        return torch.stack(scores).mean(dim=0)
+
+    def validate_attention_head_plan(self, target: AttentionHeadTarget, indices: List[int]) -> Optional[str]:
+        if target not in self.get_attention_head_targets():
+            return f"Adapter does not declare attention target '{target.name}'."
+        if not indices or len(set(indices)) != len(indices) or min(indices) < 0 or max(indices) >= target.num_heads:
+            return "Attention-head indices are invalid."
+        if len(indices) >= target.num_heads:
+            return "Attention pruning must retain at least one head."
+        return None
+
+    def apply_attention_head_mask(self, target: AttentionHeadTarget, indices: List[int]) -> None:
+        """Mask Q/K/V output slices and output-projection input slices consistently."""
+        from prune_framework.modules.model.masks import ParameterMaskManager
+
+        module, heads, width = target.module, target.num_heads, target.head_dim
+        selected = torch.as_tensor(indices, device=next(module.parameters()).device)
+        offsets = selected[:, None] * width + torch.arange(width, device=selected.device)[None, :]
+        rows = offsets.reshape(-1)
+        if target.layout == "fused_qkv":
+            weight_mask = torch.ones_like(module.in_proj_weight)
+            for projection in range(3):
+                weight_mask[rows + projection * heads * width, :] = 0
+            ParameterMaskManager.apply(module, "in_proj_weight", weight_mask)
+            if module.in_proj_bias is not None:
+                bias_mask = torch.ones_like(module.in_proj_bias)
+                for projection in range(3):
+                    bias_mask[rows + projection * heads * width] = 0
+                ParameterMaskManager.apply(module, "in_proj_bias", bias_mask)
+            output = module.out_proj
+        else:
+            for name in ("q_proj", "k_proj", "v_proj"):
+                projection = getattr(module, name)
+                weight_mask = torch.ones_like(projection.weight)
+                weight_mask[rows, :] = 0
+                ParameterMaskManager.apply(projection, "weight", weight_mask)
+                if projection.bias is not None:
+                    bias_mask = torch.ones_like(projection.bias)
+                    bias_mask[rows] = 0
+                    ParameterMaskManager.apply(projection, "bias", bias_mask)
+            output = module.o_proj
+        output_mask = torch.ones_like(output.weight)
+        output_mask[:, rows] = 0
+        ParameterMaskManager.apply(output, "weight", output_mask)
 
     def score_structural_block(
         self, target: StructuralBlockTarget, criterion: Any = None

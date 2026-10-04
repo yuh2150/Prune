@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 from .exceptions import ConfigValidationException
+from prune_framework.contracts.deployment import DeploymentTargets
 
 
 @dataclass
@@ -17,6 +18,21 @@ class ModelConfig:
     weights: str = "yolov5s.pt"
     device: str = "cuda"
     input_shape: Tuple[int, int, int, int] = (1, 3, 640, 640)
+    num_classes: Optional[int] = None
+
+
+@dataclass
+class DatasetConfig:
+    """Optional local classification dataset settings used by experiment callbacks."""
+
+    name: str = "mnist"
+    root: str = "./data"
+    batch_size: int = 64
+    num_workers: int = 0
+    train_limit: Optional[int] = None
+    val_limit: Optional[int] = None
+    emnist_split: str = "balanced"
+    image_padding: int = 0
 
 
 @dataclass
@@ -31,11 +47,16 @@ class PruningConfig:
     layer_params: Optional[List[Any]] = None
     iterative_steps: int = 1
     min_channels: int = 2
+    allow_noop: bool = False
+    calibration_kwargs: Dict[str, Any] = field(default_factory=dict)
     calibration_callback: Optional[str] = None
     calibration_batches: int = 1
     calibration_batch_size: int = 1
     calibration_seed: int = 42
     calibration_accumulate: bool = True
+    n: Optional[int] = None
+    m: Optional[int] = None
+    block_shape: Optional[List[int]] = None
 
     @property
     def method(self) -> str:
@@ -80,6 +101,13 @@ class SensitivityConfig:
 
 
 @dataclass
+class SNIPConfig:
+    """Explicitly choose the aggregation used by first-order SNIP calibration."""
+
+    gradient_aggregation: str = "signed_mean"
+
+
+@dataclass
 class EvaluationConfig:
     enabled: bool = False
     callback: Optional[str] = None
@@ -93,6 +121,7 @@ class RecoveryConfig:
     epochs: int = 0
     callback: Optional[str] = None
     kwargs: Dict[str, Any] = field(default_factory=dict)
+    optimizer: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -145,10 +174,13 @@ class ExperimentConfig:
 
 @dataclass
 class FrameworkConfig:
+    targets: DeploymentTargets = field(default_factory=DeploymentTargets)
     model: ModelConfig = field(default_factory=ModelConfig)
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
     pruning: PruningConfig = field(default_factory=PruningConfig)
     analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
     sensitivity: SensitivityConfig = field(default_factory=SensitivityConfig)
+    snip: SNIPConfig = field(default_factory=SNIPConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     recovery: RecoveryConfig = field(default_factory=RecoveryConfig)
     regularization: RegularizationConfig = field(default_factory=RegularizationConfig)
@@ -158,6 +190,11 @@ class FrameworkConfig:
     output_path: str = "pruned_checkpoint.pt"
 
     def validate(self) -> None:
+        self.targets.validate()
+        if self.model.num_classes is not None and self.model.num_classes < 1:
+            raise ConfigValidationException("model.num_classes must be positive when specified.")
+        if self.pruning.iterative_steps != 1:
+            raise ConfigValidationException("iterative_steps > 1 is not implemented; use one-shot planning.")
         if not 0.0 <= self.pruning.amount < 1.0:
             raise ConfigValidationException("pruning.target_ratio/amount must be in [0, 1).")
         if self.pruning.iterative_steps < 1:
@@ -168,6 +205,46 @@ class FrameworkConfig:
             raise ConfigValidationException("pruning.calibration_batches must be at least 1.")
         if self.pruning.calibration_batch_size < 1:
             raise ConfigValidationException("pruning.calibration_batch_size must be at least 1.")
+        if self.dataset.batch_size < 1 or self.dataset.num_workers < 0:
+            raise ConfigValidationException("dataset.batch_size must be positive and dataset.num_workers non-negative.")
+        if self.dataset.image_padding < 0:
+            raise ConfigValidationException("dataset.image_padding must be non-negative.")
+        if self.dataset.train_limit is not None and self.dataset.train_limit < 1:
+            raise ConfigValidationException("dataset.train_limit must be positive when specified.")
+        if self.dataset.val_limit is not None and self.dataset.val_limit < 1:
+            raise ConfigValidationException("dataset.val_limit must be positive when specified.")
+        classification_classes = {
+            "mnist": 10,
+            "fashionmnist": 10,
+            "fashion_mnist": 10,
+            "emnist": {
+                "byclass": 62,
+                "bymerge": 47,
+                "balanced": 47,
+                "letters": 26,
+                "digits": 10,
+                "mnist": 10,
+            },
+        }
+        dataset_name = self.dataset.name.lower()
+        if dataset_name == "emnist" and self.dataset.emnist_split.lower() not in classification_classes["emnist"]:
+            choices = ", ".join(sorted(classification_classes["emnist"]))
+            raise ConfigValidationException(f"dataset.emnist_split must be one of: {choices}.")
+        model_name = self.model.name.lower()
+        if model_name in {"lenet", "lenet5", "lenet5_emnist_onnx", "lenet5_onnx"} and dataset_name in classification_classes:
+            expected_classes = classification_classes[dataset_name]
+            if isinstance(expected_classes, dict):
+                expected_classes = expected_classes[self.dataset.emnist_split.lower()]
+            configured_classes = self.model.num_classes if self.model.num_classes is not None else 10
+            if configured_classes != expected_classes:
+                raise ConfigValidationException(
+                    f"LeNet-5 with dataset '{dataset_name}' requires model.num_classes={expected_classes}."
+                )
+        if model_name in {"lenet5_emnist_onnx", "lenet5_onnx"}:
+            if tuple(self.model.input_shape) != (1, 1, 32, 32):
+                raise ConfigValidationException("LeNet-5 EMNIST ONNX requires model.input_shape=[1, 1, 32, 32].")
+            if self.dataset.image_padding != 2:
+                raise ConfigValidationException("LeNet-5 EMNIST ONNX requires dataset.image_padding=2 for 28x28 EMNIST inputs.")
         if self.recovery.enabled and self.recovery.epochs < 1:
             raise ConfigValidationException("recovery.epochs must be at least 1 when recovery is enabled.")
         if self.regularization.strength < 0:
@@ -184,6 +261,17 @@ class FrameworkConfig:
             raise ConfigValidationException("sensitivity.rates cannot be empty when sensitivity is enabled.")
         if any(rate <= 0 or rate >= 1 for rate in self.sensitivity.rates):
             raise ConfigValidationException("Every sensitivity rate must be in (0, 1).")
+        if self.snip.gradient_aggregation not in {"signed_mean", "abs_mean"}:
+            raise ConfigValidationException("snip.gradient_aggregation must be 'signed_mean' or 'abs_mean'.")
+        pruning_name = self.pruning.pruner.lower()
+        if pruning_name in {"nm", "nm_sparsity"}:
+            n, m = self.pruning.n, self.pruning.m
+            if not isinstance(n, int) or not isinstance(m, int) or n <= 0 or m <= 0 or n > m:
+                raise ConfigValidationException("N:M pruning requires integer pruning.n and pruning.m with 0 < n <= m.")
+        if pruning_name in {"block_sparse", "block_sparsity"}:
+            shape = self.pruning.block_shape
+            if not isinstance(shape, list) or len(shape) != 2 or any(not isinstance(value, int) or value <= 0 for value in shape):
+                raise ConfigValidationException("Block-sparse pruning requires pruning.block_shape=[positive_rows, positive_columns].")
         if self.benchmark.runs < 1 or self.benchmark.warmup < 0:
             raise ConfigValidationException("benchmark.runs must be positive and benchmark.warmup non-negative.")
 
@@ -203,6 +291,9 @@ class FrameworkConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "FrameworkConfig":
         sections = dict(data)
+        unknown = set(sections) - set(cls.__dataclass_fields__)
+        if unknown:
+            raise ConfigValidationException(f'Unknown configuration sections: {sorted(unknown)}')
         pruning = dict(sections.get("pruning", {}))
         cls._rename(pruning, "method", "pruner")
         cls._rename(pruning, "structure", "granularity")
@@ -219,10 +310,13 @@ class FrameworkConfig:
             sensitivity["enabled"] = bool(analysis.get("sensitivity", False))
 
         config = cls(
+            targets=DeploymentTargets(**dict(sections.get("targets", {}))),
             model=ModelConfig(**dict(sections.get("model", {}))),
+            dataset=DatasetConfig(**dict(sections.get("dataset", {}))),
             pruning=PruningConfig(**pruning),
             analysis=AnalysisConfig(**analysis),
             sensitivity=SensitivityConfig(**sensitivity),
+            snip=SNIPConfig(**dict(sections.get("snip", {}))),
             evaluation=EvaluationConfig(**dict(sections.get("evaluation", {}))),
             recovery=RecoveryConfig(**dict(sections.get("recovery", {}))),
             regularization=RegularizationConfig(**dict(sections.get("regularization", {}))),

@@ -1,57 +1,18 @@
 # Configuration reference
 
-`FrameworkConfig` accepts the original keys (`pruner`, `granularity`, `amount`) and the research schema (`method`, `structure`, `target_ratio`). Do not mix an alias with its original name in the same section.
+[Unified configuration](../pruning.md#unified-configuration) là mô tả chính. Schema thực nằm trong [config.py](../../prune_framework/core/config.py); mẫu trong [research_unified.yaml](../../configs/research_unified.yaml).
 
-```yaml
-model:
-  name: yolov5
-  weights: weights/yolov5s.pt
-  device: cuda
+Top-level sections: `model`, `pruning`, `analysis`, `sensitivity`, `evaluation`, `targets`, `regularization`, `recovery`, `benchmark`, `export`, `experiment`; `output_path` là scalar. Không có top-level data/calibration/policy. Unknown sections bị reject.
 
-pruning:
-  method: structured       # alias: pruner
-  criterion: l1
-  structure: channel       # alias: granularity
-  target_ratio: 0.30       # alias: amount
-  global: true             # stored as global_pruning
-  min_channels: 8
+| Alias đầu vào | Field lưu trong config |
+|---|---|
+| `pruning.method` | `pruner` |
+| `pruning.structure` | `granularity` |
+| `pruning.target_ratio` | `amount` |
+| `pruning.global` | `global_pruning` |
 
-sensitivity:
-  enabled: true
-  rates: [0.1, 0.2, 0.3]
-  selector: sensitivity
-  max_allowed_relative_drop: 0.05
+Conflicting aliases bị reject. `iterative_steps` chỉ nhận 1. Dataset đi qua callback kwargs; calibration settings dưới `pruning`. Layer-wise policy dùng `layer_params` hoặc selector; không kết hợp global unstructured với policy.
 
-evaluation:
-  enabled: true
-  callback: experiments.yolov5:evaluate
-  metric: map
+`benchmark.enabled: false` không tự tắt params/FLOPs flags. Build-only vẫn có thể đo complexity. `recovery.callback: experiments.yolov5:recover` chỉ là placeholder. Các số target trong YAML là yêu cầu, không phải kết quả đo.
 
-recovery:
-  enabled: true
-  epochs: 10
-  callback: experiments.yolov5:recover
-
-benchmark:
-  latency: true
-  flops: true
-  params: true
-  warmup: 20
-  runs: 100
-
-export:
-  onnx: true
-  output_path: artifacts/model.onnx
-
-experiment:
-  name: yolov5_l1_30
-  output_dir: artifacts
-  seed: 42
-  deterministic: true
-```
-
-`evaluation.callback`, `recovery.callback`, and `pruning.calibration_callback` use `package.module:function` notation. The evaluation callback returns a metric float, a metric dictionary, or `EvaluationResult`. A recovery callback receives the pruned model and returns either that model or `None` after in-place training. Taylor requires a calibration callback that performs a representative backward pass before the pruning stage.
-
-The supported model names are the registered entries shown by `python main.py --list-models`; currently these are `yolov5`, a compatibility alias `yolov7`, and `rtdetr`. ResNet is not registered.
-
-The original `analysis.sensitivity` key remains accepted and maps to `sensitivity.enabled`. Its `analysis.layer_selection` flag is retained for old configuration compatibility; the unified pipeline runs its configured selector whenever sensitivity is enabled.
+Các config YOLO khác dùng đường weights khác mẫu research; kiểm tra path trước planning. File [rtdetr_structured.yaml](../../configs/rtdetr_structured.yaml) thực tế cấu hình depth/l2/layer.

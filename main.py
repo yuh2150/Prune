@@ -3,15 +3,19 @@ import argparse
 from prune_framework.core.registry import PluginRegistry
 from prune_framework.core.config import FrameworkConfig
 from prune_framework.pipelines.pruning import run_pruning_pipeline
+from prune_framework.pipelines.unified import UnifiedPruningPipeline
+import json
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         prog="main.py",
-        description="Modular + Plugin-based Model Pruning Framework (YOLOv5, RT-DETR, ResNet)"
+        description="Modular plugin-based pruning framework for detector and classification models"
     )
 
     parser.add_argument("--config", type=str, default=None, help="Path to YAML configuration file")
+    parser.add_argument("--build-plan-only", action="store_true", help="Build and validate policy on loaded model; stop before final apply/recovery/export")
+    parser.add_argument("--dry-run", action="store_true", help="Describe configured stages without loading models, data, or callbacks")
 
     # Dynamic Listing Flags
     parser.add_argument("--list-models", action="store_true", help="List all registered model adapters")
@@ -75,6 +79,13 @@ def main():
         config.output_path = args.output_path
 
     # Run Pipeline
+    if args.dry_run:
+        print(json.dumps(UnifiedPruningPipeline.describe_flow(config), indent=2))
+        return
+    if args.build_plan_only:
+        result = UnifiedPruningPipeline(config).run(build_plan_only=True)
+        print(json.dumps(result.plan.describe(), indent=2))
+        return
     run_pruning_pipeline(config)
 
 

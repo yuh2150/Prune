@@ -7,7 +7,12 @@ from prune_framework.modules.analysis.layer_selection import LayerSelectorModule
 
 def run_sensitivity_pipeline(config: FrameworkConfig, eval_fn, rates=[0.1, 0.2, 0.3, 0.4, 0.5]):
     device = torch.device(config.model.device if torch.cuda.is_available() else "cpu")
-    model, _ = ModelLoader.load(config.model.name, config.model.weights, device)
+    model, _ = ModelLoader.load(
+        config.model.name,
+        config.model.weights,
+        device,
+        **({"num_classes": config.model.num_classes} if config.model.num_classes is not None else {}),
+    )
 
     analyzer = SensitivityAnalyzer(
         model_name=config.model.name,
@@ -24,4 +29,3 @@ def run_sensitivity_pipeline(config: FrameworkConfig, eval_fn, rates=[0.1, 0.2, 
         results.metadata["selection"] = selection
 
     return results
-

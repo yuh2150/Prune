@@ -11,6 +11,8 @@ pruning:
   global: true
   min_channels: 8
   calibration_callback: experiments.yolov5:calibrate_taylor
+  calibration_kwargs:
+    data: data/coco50.yaml
 
 sensitivity:
   enabled: true
@@ -21,22 +23,32 @@ sensitivity:
 evaluation:
   enabled: true
   callback: experiments.yolov5:evaluate
-  metric: map
+  metric: map50_95
+  kwargs:
+    data: data/coco50.yaml
 
+targets:
+  parameter_reduction: 0.20
+  max_map50_95_drop: 0.03
+
+# This is a planning configuration. Enable recovery only with a real local
+# train split and an intentional recovery.kwargs setup.
 recovery:
-  enabled: true
-  epochs: 10
+  enabled: false
+  epochs: 0
   callback: experiments.yolov5:recover
 
 benchmark:
-  latency: true
-  flops: true
-  params: true
-  warmup: 20
-  runs: 100
+  enabled: false
+  latency: false
+  flops: false
+  params: false
+  warmup: 0
+  runs: 1
 
 export:
-  onnx: true
+  enabled: false
+  onnx: false
   output_path: artifacts/yolov5s_pruned.onnx
 
 experiment:

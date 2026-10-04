@@ -14,6 +14,8 @@ from prune_framework.core.registry import register_criterion
 
 @register_criterion("grasp")
 class GraSPCriterion(BaseImportanceCriterion):
+    supported_pruning_modes = frozenset(['unstructured'])
+    uses_bn_wrapper = False
     """Element-wise GraSP score: ``-W * (H @ grad(loss))``.
 
     The higher-order runner supplies a detached Hessian-gradient product in

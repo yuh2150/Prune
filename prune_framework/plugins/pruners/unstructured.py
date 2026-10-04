@@ -12,19 +12,25 @@ from prune_framework.modules.model.masks import MaskManager
 @register_pruner("unstructured")
 @register_pruner("unstructured_weight")
 class UnstructuredPruner(BasePruner):
+    pruning_mode = 'unstructured'
+    supports_layerwise_policy = True
+
     """Plan-based persistent element-wise pruning for Conv2d and Linear."""
 
     def create_plan(self, model_adapter: BaseModelAdapter, criterion: BaseImportanceCriterion,
                     granularity=None, config: Dict[str, Any] = None) -> PruningPlan:
         config = config or {}
+        self.validate_config(criterion, config)
         targets = self._weight_targets(model_adapter)
         pruning_params = config.get("pruning_params", config.get("amount", 0.3))
         if self._uses_global_selection(criterion, config):
             return self._create_global_plan(targets, criterion, config)
-        selections = [(index, pruning_params) for index in range(len(targets))] if isinstance(pruning_params, float) else list(pruning_params or [])
+        selections = [(index, pruning_params) for index in range(len(targets))] if isinstance(pruning_params, (int, float)) else list(pruning_params or [])
         plan = PruningPlan(pruner_name="unstructured", metadata={"criterion": config.get("criterion_name")})
         for target_index, rate in selections:
-            if target_index < 0 or target_index >= len(targets) or not 0 < rate < 1:
+            if target_index < 0 or target_index >= len(targets):
+                raise ValueError(f"Invalid layer index: {target_index}")
+            if rate == 0:
                 continue
             target = targets[target_index]
             scores = self._weight_scores(target, criterion, config)
@@ -70,7 +76,7 @@ class UnstructuredPruner(BasePruner):
         for action in plan.groups:
             module = action.primary.module
             valid = (
-                action.primary.is_weight and isinstance(module, (nn.Conv2d, nn.Linear)) and bool(action.indices)
+                action.operation == "mask_weight" and action.primary.is_weight and isinstance(module, (nn.Conv2d, nn.Linear)) and bool(action.indices)
                 and len(action.indices) <= module.weight.numel() and min(action.indices) >= 0
                 and max(action.indices) < module.weight.numel() and len(set(action.indices)) == len(action.indices)
             )

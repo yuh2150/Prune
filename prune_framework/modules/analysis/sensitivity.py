@@ -1,4 +1,5 @@
 import copy
+from prune_framework.modules.model.snapshot import ModelSnapshot
 import torch
 import torch.nn as nn
 from typing import List, Callable, Optional, Dict, Any
@@ -28,12 +29,23 @@ class SensitivityAnalyzer:
         model: nn.Module,
         pruning_rates: List[float],
         eval_fn: Callable[[nn.Module], float],
-        metric_direction: str = "higher_is_better"
+        metric_direction: str = "higher_is_better",
+        calibration=None,
+        config=None,
+        baseline=None,
     ) -> SensitivityResult:
         adapter = self.engine.adapter_cls(model)
-        pruneable_modules = adapter.get_pruneable_modules()
+        probe_config = dict(config or {})
+        probe_config['allow_noop'] = True  # small ratios may round to zero
+        # Capability checks precede any probe/evaluation.
+        probe_config['pruning_params'] = [(0, pruning_rates[0])] if pruning_rates else []
+        self.engine.validate_compatibility(probe_config)
+        if self.engine.pruner_cls.pruning_mode == 'depth':
+            raise ValueError('Depth pruning does not support layer-wise sensitivity')
+        pruneable_modules = [(target.name, target.module) for target in self.engine.targets(model)]
+        snapshot = baseline or ModelSnapshot(model)
 
-        baseline_score = eval_fn(model)
+        baseline_score = eval_fn(snapshot.restore())
         logger.info(
             f"Sensitivity Analysis starting for {len(pruneable_modules)} layers across {len(pruning_rates)} rates. "
             f"Baseline metric: {baseline_score:.4f}"
@@ -44,16 +56,18 @@ class SensitivityAnalyzer:
         for idx, (layer_name, _) in enumerate(pruneable_modules):
             profile = LayerSensitivityProfile(layer_idx=idx, layer_name=layer_name)
             for rate in pruning_rates:
-                model_copy = copy.deepcopy(model)
-                config = {"pruning_params": [(idx, rate)]}
+                model_copy = snapshot.restore()
+                execution_config = {**probe_config, "pruning_params": [(idx, rate)]}
+                if calibration:
+                    execution_config.update(calibration)
                 try:
-                    self.engine.execute(model_copy, config, verify_forward=False)
+                    self.engine.execute(model_copy, execution_config, verify_forward=False)
                     score = eval_fn(model_copy)
                     if metric_direction == "higher_is_better":
                         drop = baseline_score - score
                     else:
                         drop = score - baseline_score
-                    rel_drop = drop / abs(baseline_score) if baseline_score != 0 else 0.0
+                    rel_drop = drop / abs(baseline_score) if baseline_score != 0 else (float("inf") if drop > 0 else 0.0)
 
                     pt = SensitivityPoint(
                         rate=rate,

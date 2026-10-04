@@ -1,3 +1,11 @@
+# Historical Results / Legacy Documentation
+
+> These results were produced by an earlier pipeline and have not yet been revalidated against the current unified pruning flow.
+>
+> Nội dung bên dưới được giữ để truy xuất lịch sử. Commands, API, capability claims và số liệu không phải hướng dẫn hoặc validation cho code hiện tại. Xem [Pruning Framework](pruning.md).
+
+---
+
 # Quy Trình (Workflow) Tối Ưu Hóa & Nén Mô Hình: YOLOv5 & RT-DETR
 
 Tài liệu này chuẩn hóa và phân định rõ ràng 3 quy trình (workflow) nén mô hình trong dự án: **Structured Channel (Width) Pruning**, **Structured Layer (Depth) Pruning**, và **Unstructured Pruning**. 

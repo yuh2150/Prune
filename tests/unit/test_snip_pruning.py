@@ -6,7 +6,7 @@ from unittest.mock import patch
 import torch
 import torch.nn as nn
 
-from prune_framework.contracts import BaseModelAdapter, TargetType
+from prune_framework.contracts import BaseModelAdapter, PrunableTarget, TargetType
 from prune_framework.core.config import FrameworkConfig
 from prune_framework.core.exceptions import ConfigValidationException
 from prune_framework.modules.calibration import CalibrationResult, GradientCalibrationRunner
@@ -104,6 +104,47 @@ class TestSNIPPruning(unittest.TestCase):
             second_score = criterion.score(target.module, second.context_for(target))
             self.assertTrue(torch.equal(first.gradients[target.name], second.gradients[target.name]))
             self.assertTrue(torch.equal(first_score, second_score))
+
+    def test_explicit_abs_mean_variant_changes_opposing_gradient_ranking(self):
+        model = nn.Linear(1, 2, bias=False)
+        with torch.no_grad():
+            model.weight.fill_(1)
+        target = PrunableTarget("linear", model, TargetType.LINEAR_WEIGHT)
+        batches = [torch.tensor([[10.0], [2.0]]), torch.tensor([[-10.0], [2.0]])]
+
+        def signed_component(candidate, coefficients):
+            return (candidate.weight[:, 0] * coefficients[:, 0]).sum()
+
+        signed = GradientCalibrationRunner(seed=1, aggregation="signed_mean").run(
+            model, [target], batches, signed_component
+        )
+        absolute = GradientCalibrationRunner(seed=1, aggregation="abs_mean").run(
+            model, [target], batches, signed_component
+        )
+        criterion = SNIPCriterion()
+        signed_scores = criterion.score(model, signed.context_for(target)).flatten()
+        absolute_scores = criterion.score(model, absolute.context_for(target)).flatten()
+        self.assertLess(signed_scores[0], signed_scores[1])
+        self.assertGreater(absolute_scores[0], absolute_scores[1])
+        self.assertEqual(signed.aggregation, "signed_mean")
+        self.assertEqual(absolute.aggregation, "abs_mean")
+
+    def test_one_batch_aggregation_variants_are_equivalent_and_invalid_mode_fails(self):
+        target = self.targets[0]
+        signed = GradientCalibrationRunner(seed=2, aggregation="signed_mean").run(
+            self.model, [target], [self.images], self.loss_fn
+        )
+        absolute = GradientCalibrationRunner(seed=2, aggregation="abs_mean").run(
+            self.model, [target], [self.images], self.loss_fn
+        )
+        self.assertTrue(torch.equal(
+            SNIPCriterion().score(target.module, signed.context_for(target)),
+            SNIPCriterion().score(target.module, absolute.context_for(target)),
+        ))
+        with self.assertRaisesRegex(ValueError, "signed_mean"):
+            GradientCalibrationRunner(aggregation="abs_sum")
+        with self.assertRaisesRegex(ConfigValidationException, "snip.gradient_aggregation"):
+            FrameworkConfig.from_dict({"snip": {"gradient_aggregation": "abs_sum"}})
 
     def test_global_selection_is_exact_and_ties_use_target_then_flat_index_order(self):
         with torch.no_grad():

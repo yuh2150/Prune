@@ -1,0 +1,30 @@
+# No-download EMNIST Balanced plan smoke (47 classes). It does not access the dataset.
+model:
+  name: lenet5
+  weights: random
+  device: cpu
+  input_shape: [1, 1, 28, 28]
+  num_classes: 47
+
+dataset:
+  name: emnist
+  emnist_split: balanced
+  root: ./data/emnist
+  batch_size: 64
+  num_workers: 0
+  train_limit: 512
+  val_limit: 256
+
+pruning:
+  method: unstructured
+  criterion: magnitude
+  structure: weight
+  target_ratio: 0.10
+
+sensitivity: {enabled: false}
+evaluation: {enabled: false}
+recovery: {enabled: false, epochs: 0}
+benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+export: {enabled: false, onnx: false}
+experiment: {name: lenet5_emnist_balanced_plan_smoke, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/lenet5_emnist_balanced_plan_smoke.pt

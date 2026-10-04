@@ -4,7 +4,7 @@ import torch.nn as nn
 from typing import List, Tuple, Optional, Any, Set
 from prune_framework.core.interfaces import BaseModelAdapter
 from prune_framework.core.registry import register_model
-from prune_framework.contracts.targets import StructuralBlockTarget, TargetType
+from prune_framework.contracts.targets import AttentionHeadTarget, StructuralBlockTarget, TargetType
 
 
 @register_model("rtdetr")
@@ -79,6 +79,29 @@ class RTDETRAdapter(BaseModelAdapter):
                         metadata={"stack": kind},
                     )
                 )
+        return targets
+
+    def get_attention_head_targets(self) -> List[AttentionHeadTarget]:
+        """Expose only Transformers' explicit RTDetrSelfAttention protocol.
+
+        This is masked-head pruning, so tensor dimensions and decoder metadata
+        remain unchanged.  The adapter never guesses from arbitrary Linear
+        modules.
+        """
+        targets = []
+        for name, module in self.model.named_modules():
+            if type(module).__name__ != "RTDetrSelfAttention":
+                continue
+            if not all(hasattr(module, field) for field in ("q_proj", "k_proj", "v_proj", "o_proj", "head_dim")):
+                continue
+            width = int(module.head_dim)
+            hidden = int(module.q_proj.out_features)
+            if width < 1 or hidden % width or hidden // width < 2:
+                continue
+            targets.append(AttentionHeadTarget(
+                name=name, module=module, num_heads=hidden // width, head_dim=width,
+                layout="separate_qkv", metadata={"family": "rtdetr", "semantics": "masked_head"},
+            ))
         return targets
 
     def validate_structural_block_plan(self, targets: List[StructuralBlockTarget]) -> dict[str, str]:

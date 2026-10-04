@@ -1,0 +1,16 @@
+# [1, 1] is deliberately the only universally divisible LeNet-5 block shape.
+model: {name: lenet5, weights: random, device: cpu, input_shape: [1, 1, 28, 28]}
+dataset: {name: mnist, root: ./data/mnist, batch_size: 64, num_workers: 0, train_limit: 512, val_limit: 256}
+pruning:
+  method: block_sparse
+  criterion: magnitude
+  structure: weight
+  target_ratio: 0.10
+  block_shape: [1, 1]
+sensitivity: {enabled: false}
+evaluation: {enabled: false}
+recovery: {enabled: false, epochs: 0}
+benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+export: {enabled: false, onnx: false}
+experiment: {name: lenet5_block_sparse_smoke, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/lenet5_block_sparse_smoke.pt

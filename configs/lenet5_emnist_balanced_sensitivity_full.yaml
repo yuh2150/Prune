@@ -1,0 +1,46 @@
+# Full ONNX EMNIST Balanced sensitivity → structured pruning → recovery experiment.
+model:
+  name: lenet5_emnist_onnx
+  weights: LeNet5_Numbers&Characters_FP32.onnx
+  device: cuda
+  input_shape: [1, 1, 32, 32]
+  num_classes: 47
+
+dataset:
+  name: emnist
+  emnist_split: balanced
+  root: ./data/emnist
+  image_padding: 2
+  batch_size: 128
+  num_workers: 0
+
+pruning:
+  method: structured
+  criterion: l1
+  structure: channel
+  target_ratio: 0.30
+  global_pruning: false
+  min_channels: 2
+
+sensitivity:
+  enabled: true
+  rates: [0.10, 0.20, 0.30, 0.40, 0.50]
+  selector: sensitivity
+  max_allowed_relative_drop: 0.05
+  metric_direction: higher_is_better
+
+evaluation:
+  enabled: true
+  callback: experiments.classification:evaluate
+  metric: accuracy
+
+recovery:
+  enabled: true
+  epochs: 5
+  callback: experiments.classification:recover
+  optimizer: {name: sgd, lr: 0.01, momentum: 0.9}
+
+benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+export: {enabled: false, onnx: false}
+experiment: {name: lenet5_emnist_balanced_sensitivity, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/lenet5_emnist_balanced_sensitivity.pt

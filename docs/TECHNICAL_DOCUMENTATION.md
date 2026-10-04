@@ -1,3 +1,11 @@
+# Historical Results / Legacy Documentation
+
+> These results were produced by an earlier pipeline and have not yet been revalidated against the current unified pruning flow.
+>
+> Nội dung bên dưới được giữ để truy xuất lịch sử. Commands, API, capability claims và số liệu không phải hướng dẫn hoặc validation cho code hiện tại. Xem [Pruning Framework](pruning.md).
+
+---
+
 # Model Pruning & Sensitivity Analysis Framework: Technical Documentation
 **A Comprehensive Guide to Structured, Layer, and Taylor Expansion Pruning for YOLOv5 and RT-DETR Architectures**
 

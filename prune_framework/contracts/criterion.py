@@ -7,6 +7,10 @@ from typing import Optional, Dict, Any
 class BaseImportanceCriterion(ABC):
     """Abstract Base Class for Importance Criteria."""
 
+    supported_pruning_modes = frozenset({"structured", "unstructured", "depth"})
+    uses_bn_wrapper = False
+    supported_module_types = (nn.Conv2d, nn.Linear)
+
     @abstractmethod
     def score(self, module: nn.Module, context: Optional[Dict[str, Any]] = None) -> torch.Tensor:
         """Computes 1D tensor of importance scores for channels, weights, or blocks."""
