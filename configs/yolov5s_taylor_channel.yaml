@@ -1,0 +1,57 @@
+# Taylor first-order structured channel pruning. Calibration uses local COCO data
+# and a single fixed validation batch; recovery/fine-tuning is intentionally off.
+model:
+  name: yolov5
+  weights: weights/yolov5s.pt
+  device: cuda
+  input_shape: [1, 3, 640, 640]
+
+pruning:
+  pruner: structured
+  criterion: taylor
+  granularity: channel
+  amount: 0.10
+  global_pruning: true
+  min_channels: 8
+  calibration_callback: experiments.yolov5:calibrate_taylor
+  calibration_kwargs:
+    data: data/coco_500.yaml
+  calibration_batches: 1
+  calibration_batch_size: 4
+  calibration_seed: 42
+
+sensitivity:
+  # Two rates keep Taylor sensitivity feasible on the local COCO-500 subset.
+  enabled: true
+  rates: [0.05, 0.10]
+  selector: sensitivity
+  max_allowed_relative_drop: 0.05
+
+evaluation:
+  enabled: true
+  callback: experiments.yolov5:evaluate
+  metric: map50_95
+  kwargs:
+    data: data/coco_500.yaml
+    batch_size: 8
+    imgsz: 640
+
+recovery:
+  enabled: false
+  epochs: 0
+
+benchmark:
+  enabled: true
+  latency: true
+  flops: false
+  params: true
+  warmup: 10
+  runs: 10
+
+experiment:
+  name: yolov5s_taylor_channel_global_10
+  output_dir: artifacts
+  seed: 42
+  deterministic: true
+
+output_path: artifacts/yolov5s_taylor_channel_global_10.pt

@@ -19,7 +19,11 @@ from prune_framework.modules.calibration import HigherOrderCalibrationResult, Hi
 from prune_framework.modules.model.masks import MaskManager
 from prune_framework.pipelines.unified import UnifiedPruningPipeline
 from prune_framework.plugins.adapters.yolov5 import YOLOv5Adapter
-from prune_framework.plugins.criteria.grasp_criteria import GraSPCriterion
+from prune_framework.plugins.criteria.grasp_criteria import (
+    GraSPConv1CappedCriterion,
+    GraSPCriterion,
+    GraSPLayerNormalizedCriterion,
+)
 from prune_framework.plugins.granularities.base import WeightGranularity
 from prune_framework.plugins.pruners.unstructured import UnstructuredPruner
 
@@ -182,6 +186,43 @@ class TestGraSPPruning(unittest.TestCase):
             mask = MaskManager.mask(module)
             self.assertTrue(torch.equal(MaskManager.original_weight(module)[mask == 0], torch.zeros_like(MaskManager.original_weight(module)[mask == 0])))
         self.assertEqual(tuple(self.model(self.images).shape), (2, 4))
+
+    def test_layer_normalized_variant_records_raw_and_normalized_score_statistics(self):
+        calibration = self._calibrate()
+        plan = UnstructuredPruner().create_plan(
+            self.adapter,
+            GraSPLayerNormalizedCriterion(),
+            WeightGranularity(),
+            {"amount": 0.10, "criterion_name": "grasp_layer_normalized", "higher_order_calibration": calibration},
+        )
+
+        statistics = plan.metadata["score_statistics"]
+        self.assertEqual(set(statistics), {"conv", "linear"})
+        for details in statistics.values():
+            self.assertEqual(details["normalization"], "mean_abs")
+            self.assertGreater(details["normalization_scale"], 0.0)
+            self.assertAlmostEqual(details["normalized"]["mean_abs"], 1.0, places=6)
+
+    def test_conv1_capped_variant_redistributes_global_budget(self):
+        with torch.no_grad():
+            self.model.conv.weight.fill_(1.0)
+            self.model.linear.weight.fill_(1.0)
+        zero_hvp = {target.name: torch.zeros_like(target.module.weight) for target in self.targets}
+        calibration = HigherOrderCalibrationResult(gradients=zero_hvp, batches=1)
+        criterion = GraSPConv1CappedCriterion()
+        criterion.max_pruning_fraction_by_target = {"conv": 0.10}
+        plan = UnstructuredPruner().create_plan(
+            self.adapter,
+            criterion,
+            WeightGranularity(),
+            {"amount": 0.25, "criterion_name": "grasp_conv1_capped", "higher_order_calibration": calibration},
+        )
+
+        selected = {group.primary.name: len(group.indices) for group in plan.groups}
+        self.assertEqual(plan.metadata["selected_elements"], 20)
+        self.assertLessEqual(selected["conv"], 1)  # round(8 * 10%)
+        self.assertEqual(sum(selected.values()), 20)
+        self.assertEqual(plan.metadata["max_pruning_fraction_by_target"], {"conv": 0.10})
 
     def test_yolo_pipeline_uses_higher_order_loss_and_rtdetr_fails_explicitly(self):
         with tempfile.TemporaryDirectory() as directory:

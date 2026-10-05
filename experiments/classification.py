@@ -62,12 +62,10 @@ def recover(
     **_unused,
 ):
     """Fine-tune a pruned classifier with CrossEntropyLoss and persistent masks."""
-    if stage != "recovery":
-        raise ValueError("Classification recovery supports only the 'recovery' stage.")
+    if stage not in {"recovery", "regularization"}:
+        raise ValueError("Classification recovery supports only recovery or regularization stages.")
     if config.recovery.epochs < 1:
         raise ValueError("recovery.epochs must be at least 1 for classification recovery.")
-    if regularization is not None:
-        raise ValueError("LeNet-5 has no adapter-declared BN regularization targets.")
     if dataloader is None:
         dataloader = _loaders(config).train
     device = torch.device(device)
@@ -97,8 +95,12 @@ def recover(
             for batch in dataloader:
                 optimizer.zero_grad(set_to_none=True)
                 loss = _loss(model, batch, device)
+                if regularization is not None:
+                    loss, _ = regularization.augment_loss(loss)
                 loss.backward()
                 optimizer.step()
+                if regularization is not None:
+                    regularization.advance()
                 MaskManager.enforce(model)
                 losses.append(float(loss.detach()))
                 steps += 1

@@ -52,6 +52,11 @@ class PruningEngine:
         return adapter.get_structural_block_targets()
 
     def validate_compatibility(self, config):
+        config = dict(config or {})
+        # Pruners that constrain compatible criteria need the registry name,
+        # not only the concrete criterion class.  ``build_plan`` already adds
+        # this field, while dry-run compatibility validation happens earlier.
+        config.setdefault("criterion_name", self.criterion_name)
         self.pruner_cls().validate_config(self.criterion_cls(), config)
 
     def validate_model_compatibility(self, model, config):

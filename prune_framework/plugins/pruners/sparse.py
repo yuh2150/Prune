@@ -29,8 +29,8 @@ class _PatternPruner(BasePruner):
         return model_adapter.model
 
 
-@register_pruner("nm_sparsity")
-@register_pruner("n_sparsity")
+@register_pruner("legacy_nm_sparsity")
+@register_pruner("legacy_n_sparsity")
 class NMSparsityPruner(_PatternPruner):
     kind = "nm"
     def create_plan(self, model_adapter, criterion=None, granularity=None, config: Dict[str, Any] | None=None):
@@ -42,7 +42,7 @@ class NMSparsityPruner(_PatternPruner):
         return plan
 
 
-@register_pruner("block_sparse")
+@register_pruner("legacy_block_sparse")
 class BlockSparsePruner(_PatternPruner):
     kind = "block_sparse"
     def create_plan(self, model_adapter, criterion=None, granularity=None, config: Dict[str, Any] | None=None):

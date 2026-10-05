@@ -32,6 +32,21 @@ _EXPECTED_MODULES = {
 }
 
 
+def describe_dependency(dependency: Dict[str, Any]) -> Dict[str, Any]:
+    """Make plan dependency metadata JSON-serializable without dumping tensors."""
+    described = {}
+    for key, value in dependency.items():
+        if hasattr(value, "shape") and hasattr(value, "numel"):
+            described[key] = {
+                "shape": list(value.shape),
+                "zeros": int((value == 0).sum().item()),
+                "elements": int(value.numel()),
+            }
+        else:
+            described[key] = value
+    return described
+
+
 @dataclass(frozen=True)
 class PrunableTarget:
     """A typed parameter or structural feature exposed by a model adapter."""
@@ -65,18 +80,6 @@ class PrunableTarget:
         return None
 
     def describe(self) -> Dict[str, Any]:
-        def describe_dependency(dependency: Dict[str, Any]) -> Dict[str, Any]:
-            described = {}
-            for key, value in dependency.items():
-                if hasattr(value, "shape") and hasattr(value, "numel"):
-                    described[key] = {
-                        "shape": list(value.shape),
-                        "zeros": int((value == 0).sum().item()),
-                        "elements": int(value.numel()),
-                    }
-                else:
-                    described[key] = value
-            return described
         return {
             "name": self.name,
             "target_type": self.target_type.value,

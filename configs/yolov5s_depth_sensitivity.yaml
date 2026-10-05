@@ -1,0 +1,42 @@
+# Practical validation run: each C3/CSP Bottleneck is ablated independently
+# on the local COCO-500 subset before the safest blocks are removed together.
+model:
+  name: yolov5
+  weights: weights/yolov5s.pt
+  device: cuda
+  input_shape: [1, 3, 640, 640]
+
+pruning:
+  pruner: depth
+  criterion: l1
+  granularity: layer
+  amount: 0.20
+
+sensitivity:
+  enabled: true
+  max_allowed_relative_drop: 0.30
+
+evaluation:
+  enabled: true
+  callback: experiments.yolov5:evaluate
+  metric: map50_95
+  kwargs:
+    data: data/coco_500.yaml
+    batch_size: 8
+    imgsz: 640
+
+benchmark:
+  enabled: true
+  latency: true
+  flops: true
+  params: true
+  warmup: 10
+  runs: 50
+
+experiment:
+  name: yolov5s_depth_sensitivity
+  output_dir: artifacts
+  seed: 42
+  deterministic: true
+
+output_path: artifacts/yolov5s_depth_sensitivity_pruned.pt

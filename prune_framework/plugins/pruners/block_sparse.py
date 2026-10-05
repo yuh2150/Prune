@@ -35,7 +35,11 @@ class BlockSparsePruner(BasePruner):
         if not isinstance(amount, (int, float)) or not 0 <= float(amount) < 1:
             raise ValueError("Block-sparse pruning amount must be in [0, 1).")
         name = str(config.get("criterion_name", type(criterion).__name__)).lower()
-        if name not in {"magnitude", "l1", "l1_norm", "l2", "l2_norm"}:
+        if name not in {
+            "magnitude", "magnitudecriterion",
+            "l1", "l1_norm", "l1normcriterion",
+            "l2", "l2_norm", "l2normcriterion",
+        }:
             raise ValueError("Block-sparse pruning currently supports magnitude, L1, or L2 scoring only.")
 
     def create_plan(

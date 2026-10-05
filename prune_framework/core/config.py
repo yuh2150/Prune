@@ -33,6 +33,8 @@ class DatasetConfig:
     val_limit: Optional[int] = None
     emnist_split: str = "balanced"
     image_padding: int = 0
+    validation_fraction: float = 0.2
+    train_root: Optional[str] = None
 
 
 @dataclass
@@ -209,6 +211,8 @@ class FrameworkConfig:
             raise ConfigValidationException("dataset.batch_size must be positive and dataset.num_workers non-negative.")
         if self.dataset.image_padding < 0:
             raise ConfigValidationException("dataset.image_padding must be non-negative.")
+        if not 0.0 < self.dataset.validation_fraction < 1.0:
+            raise ConfigValidationException("dataset.validation_fraction must be in (0, 1).")
         if self.dataset.train_limit is not None and self.dataset.train_limit < 1:
             raise ConfigValidationException("dataset.train_limit must be positive when specified.")
         if self.dataset.val_limit is not None and self.dataset.val_limit < 1:
@@ -225,6 +229,7 @@ class FrameworkConfig:
                 "digits": 10,
                 "mnist": 10,
             },
+            "custom_47labels": 47,
         }
         dataset_name = self.dataset.name.lower()
         if dataset_name == "emnist" and self.dataset.emnist_split.lower() not in classification_classes["emnist"]:

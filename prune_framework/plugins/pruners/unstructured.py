@@ -52,8 +52,13 @@ class UnstructuredPruner(BasePruner):
         amount = config.get("amount", config.get("pruning_params", 0.3))
         if not isinstance(amount, (int, float)):
             raise ValueError("Global element-wise pruning requires one numeric amount.")
-        score_items = [(target, self._weight_scores(target, criterion, config)) for target in targets]
-        selection = GlobalScoreSelector.select_lowest(score_items, float(amount))
+        raw_score_items = [(target, self._weight_scores(target, criterion, config)) for target in targets]
+        score_items, score_statistics = self._normalise_global_scores(raw_score_items, criterion)
+        caps = getattr(criterion, "max_pruning_fraction_by_target", None)
+        selection = (
+            GlobalScoreSelector.select_lowest_with_caps(score_items, float(amount), caps)
+            if caps else GlobalScoreSelector.select_lowest(score_items, float(amount))
+        )
         plan = PruningPlan(
             pruner_name="unstructured",
             metadata={
@@ -62,6 +67,8 @@ class UnstructuredPruner(BasePruner):
                 "requested_amount": float(amount),
                 "total_elements": selection.total_elements,
                 "selected_elements": selection.selected_elements,
+                **({"score_statistics": score_statistics} if score_statistics else {}),
+                **({"max_pruning_fraction_by_target": dict(caps)} if caps else {}),
             },
         )
         for target in targets:
@@ -69,6 +76,44 @@ class UnstructuredPruner(BasePruner):
             if indices:
                 plan.groups.append(PruningGroup(primary=target, operation="mask_weight", indices=indices))
         return plan
+
+    @staticmethod
+    def _normalise_global_scores(
+        score_items: List[tuple[PrunableTarget, torch.Tensor]], criterion: BaseImportanceCriterion,
+    ) -> tuple[List[tuple[PrunableTarget, torch.Tensor]], Dict[str, Dict[str, Any]]]:
+        """Normalize score scale only for explicitly named saliency variants."""
+        method = getattr(criterion, "score_normalization", None)
+        if method is None:
+            return score_items, {}
+        if method != "mean_abs":
+            raise ValueError(f"Unsupported global score normalization: {method}")
+        normalized: List[tuple[PrunableTarget, torch.Tensor]] = []
+        statistics: Dict[str, Dict[str, Any]] = {}
+        for target, scores in score_items:
+            raw = scores.detach()
+            mean_abs = raw.abs().mean()
+            scale = mean_abs.clamp_min(torch.finfo(raw.dtype).eps)
+            adjusted = raw / scale
+            statistics[target.name] = {
+                "normalization": method,
+                "raw": UnstructuredPruner._score_statistics(raw),
+                "normalization_scale": float(scale.detach().cpu()),
+                "normalized": UnstructuredPruner._score_statistics(adjusted),
+            }
+            normalized.append((target, adjusted))
+        return normalized, statistics
+
+    @staticmethod
+    def _score_statistics(scores: torch.Tensor) -> Dict[str, float | int]:
+        values = scores.detach().reshape(-1).to(dtype=torch.float64, device="cpu")
+        return {
+            "count": int(values.numel()),
+            "min": float(values.min()),
+            "max": float(values.max()),
+            "mean": float(values.mean()),
+            "mean_abs": float(values.abs().mean()),
+            "std": float(values.std(unbiased=False)),
+        }
 
     def validate_plan(self, plan: PruningPlan, model_adapter: BaseModelAdapter,
                       config: Dict[str, Any] = None) -> bool:

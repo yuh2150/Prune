@@ -39,3 +39,29 @@ class GraSPCriterion(BaseImportanceCriterion):
                 f"weight shape {tuple(module.weight.shape)}."
             )
         return (-(module.weight.detach() * hessian_gradient_product.detach())).detach()
+
+
+@register_criterion("grasp_layer_normalized")
+class GraSPLayerNormalizedCriterion(GraSPCriterion):
+    """GraSP with per-layer score-scale normalization before global ranking.
+
+    Raw GraSP scores are still computed exactly as :class:`GraSPCriterion`.
+    The unstructured pruner divides every target's scores by its mean absolute
+    score before its global comparison and records raw/normalized statistics in
+    the pruning plan.  This is intentionally a separately named variant, not
+    a change to the plain ``grasp`` baseline.
+    """
+
+    score_normalization = "mean_abs"
+
+
+@register_criterion("grasp_conv1_capped")
+class GraSPConv1CappedCriterion(GraSPCriterion):
+    """Plain GraSP ranking with a maximum 10% budget for ``conv1.conv``.
+
+    The cap prevents the first feature extractor from absorbing the global
+    pruning budget. Remaining eligible weights are still ranked globally by
+    the unmodified GraSP score.
+    """
+
+    max_pruning_fraction_by_target = {"conv1.conv": 0.10}

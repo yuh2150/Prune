@@ -60,28 +60,30 @@ class NMSparsityPruner(BasePruner):
                 "m": m,
                 "implied_weight_sparsity": 1.0 - (n / m),
                 "selection": "per_group_magnitude",
+                "skipped_incompatible_targets": [],
             },
         )
         for target in UnstructuredPruner._weight_targets(model_adapter):
             scores = weight_matrix(target.module).detach().abs()
             if scores.shape[1] % m:
-                raise ValueError(
-                    f"N:M pruning requires {target.name} input width {scores.shape[1]} to be divisible by m={m}."
-                )
+                # CNN stems (e.g. RGB 7x7 convolutions) often cannot express a
+                # 2:4 pattern. Preserve their dense weights and apply the
+                # documented pattern to all compatible targets.
+                plan.metadata["skipped_incompatible_targets"].append({
+                    "name": target.name, "input_width": int(scores.shape[1]), "m": m,
+                })
+                continue
             existing = self._existing_matrix_mask(target.module)
-            mask = torch.zeros_like(scores)
-            for row in range(scores.shape[0]):
-                for start in range(0, scores.shape[1], m):
-                    active = existing[row, start:start + m].bool()
-                    # Stable order makes equal scores keep lower input indices.
-                    order = torch.argsort(scores[row, start:start + m], descending=True, stable=True)
-                    kept = 0
-                    for offset in order.tolist():
-                        if active[offset]:
-                            mask[row, start + offset] = 1
-                            kept += 1
-                            if kept == n:
-                                break
+            # Vectorized group-wise top-k: avoids millions of Python loops on
+            # ImageNet-scale convolution weights while preserving existing masks.
+            grouped_scores = scores.reshape(scores.shape[0], -1, m)
+            active = existing.bool().reshape_as(grouped_scores)
+            ranked = grouped_scores.masked_fill(~active, float("-inf"))
+            selected = torch.argsort(ranked, dim=-1, descending=True, stable=True)[..., :n]
+            selected_active = active.gather(-1, selected)
+            grouped_mask = torch.zeros_like(grouped_scores)
+            grouped_mask.scatter_(-1, selected, selected_active.to(grouped_mask.dtype))
+            mask = grouped_mask.reshape_as(scores)
             if not validate_nm_pattern(mask, n, m, exact=False):
                 raise RuntimeError(f"Internal N:M mask generation failed for {target.name}.")
             pruned = torch.nonzero(mask.reshape(-1).eq(0), as_tuple=False).flatten().tolist()

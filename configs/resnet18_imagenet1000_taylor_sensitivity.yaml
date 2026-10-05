@@ -1,0 +1,60 @@
+# Each probe restores the pretrained ResNet-18 baseline, prunes one convolution
+# independently, and evaluates on the fixed 1,000-image ImageNet validation subset.
+model:
+  name: resnet18
+  weights: DEFAULT
+  device: cuda
+  input_shape: [1, 3, 224, 224]
+  num_classes: 1000
+
+dataset:
+  name: imagenet1k_subset
+  root: datasets/imagenet1k_val_1000
+  batch_size: 64
+  num_workers: 0
+
+pruning:
+  method: structured
+  criterion: taylor
+  structure: filter
+  # Used only as the per-layer upper bound by the selector after the probes.
+  target_ratio: 0.10
+  global_pruning: false
+  min_channels: 2
+  calibration_callback: experiments.classification:calibrate
+  calibration_batches: 4
+  calibration_batch_size: 64
+  calibration_seed: 42
+
+sensitivity:
+  enabled: true
+  rates: [0.01, 0.03, 0.05, 0.10]
+  selector: sensitivity
+  max_allowed_relative_drop: 0.05
+  metric_direction: higher_is_better
+
+evaluation:
+  enabled: true
+  callback: experiments.classification:evaluate
+  metric: accuracy
+
+recovery:
+  enabled: false
+
+# This run is a sensitivity study, not a final deployment benchmark.
+benchmark:
+  enabled: false
+  latency: false
+  flops: false
+  params: false
+  warmup: 0
+  runs: 1
+
+export:
+  enabled: false
+
+experiment:
+  name: resnet18_imagenet1000_taylor_sensitivity
+  output_dir: artifacts
+  seed: 42
+  deterministic: true

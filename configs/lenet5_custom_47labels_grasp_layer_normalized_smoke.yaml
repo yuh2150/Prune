@@ -1,0 +1,12 @@
+# GraSP variant: each target's raw HVP saliency is divided by mean(|score|)
+# before global selection. The pruning plan stores raw/normalized statistics.
+model: {name: lenet5_emnist_onnx, weights: LeNet5_Numbers&Characters_FP32.onnx, device: cpu, input_shape: [1, 1, 32, 32], num_classes: 47}
+dataset: {name: custom_47labels, root: ./Dataset_MNIST_47Labels_1000images, batch_size: 64, num_workers: 0, validation_fraction: 0.2, image_padding: 2}
+pruning: {method: unstructured, criterion: grasp_layer_normalized, structure: weight, target_ratio: 0.10, global_pruning: true, calibration_callback: experiments.classification:calibrate, calibration_batches: 16, calibration_batch_size: 64}
+sensitivity: {enabled: false}
+evaluation: {enabled: true, callback: experiments.classification:evaluate, metric: accuracy}
+recovery: {enabled: false, epochs: 0}
+benchmark: {enabled: true, latency: true, flops: true, params: true, warmup: 10, runs: 30}
+export: {enabled: false, onnx: false}
+experiment: {name: lenet5_custom_47labels_grasp_layer_normalized_smoke, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke.pt

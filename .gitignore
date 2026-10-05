@@ -147,6 +147,19 @@ cython_debug/
 # Datasets and large data directories
 data/
 
+# Local datasets used by pruning experiments.  Keep the dataset loader source
+# files in /datasets tracked; ignore only downloaded/extracted data folders.
+/Dataset_MNIST_47Labels_1000images/
+/datasets/cifar10/
+/datasets/coco128/
+/datasets/imagenet1k_train_2000/
+/datasets/imagenet1k_val_1000/
+
+# Generated experiment artifacts and downloaded dataset archives stay local.
+
+/coco*.zip
+/~$*
+
 # Model weights and checkpoints
 weights/**/*.pt
 weights/**/*.pth

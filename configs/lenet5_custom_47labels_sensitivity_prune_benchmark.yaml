@@ -1,0 +1,41 @@
+# Sensitivity -> layer selection -> structured prune -> benchmark. Recovery is disabled.
+model:
+  name: lenet5_emnist_onnx
+  weights: LeNet5_Numbers&Characters_FP32.onnx
+  device: cpu
+  input_shape: [1, 1, 32, 32]
+  num_classes: 47
+
+dataset:
+  name: custom_47labels
+  root: ./Dataset_MNIST_47Labels_1000images
+  batch_size: 64
+  num_workers: 0
+  validation_fraction: 0.2
+  image_padding: 2
+
+pruning:
+  method: structured
+  criterion: l1
+  structure: channel
+  target_ratio: 0.30
+  global_pruning: false
+  min_channels: 2
+
+sensitivity:
+  enabled: true
+  rates: [0.10, 0.20, 0.30, 0.40, 0.50]
+  selector: sensitivity
+  max_allowed_relative_drop: 0.05
+  metric_direction: higher_is_better
+
+evaluation:
+  enabled: true
+  callback: experiments.classification:evaluate
+  metric: accuracy
+
+recovery: {enabled: false, epochs: 0}
+benchmark: {enabled: true, latency: true, flops: true, params: true, warmup: 20, runs: 100}
+export: {enabled: false, onnx: false}
+experiment: {name: lenet5_custom_47labels_sensitivity_prune_benchmark, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/lenet5_custom_47labels_pruned.pt

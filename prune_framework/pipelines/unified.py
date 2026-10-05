@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import math
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Optional
 
@@ -186,6 +187,11 @@ class UnifiedPruningPipeline:
         baseline_metrics = self._evaluate(baseline_snapshot.restore(), "baseline") if self._needs_evaluation() else None
         if baseline_metrics is not None:
             stages["baseline_evaluation"] = baseline_metrics
+            baseline_error = _invalid_baseline_reason(cfg, baseline_metrics)
+            if baseline_error:
+                artifacts.write_json("result.json", {"status": "INVALID_BASELINE", "failure_reason": baseline_error,
+                    "baseline_valid": False, "baseline_metrics": baseline_metrics})
+                raise PruningExecutionError(f"INVALID_BASELINE: {baseline_error}")
 
         regularization = None
         if cfg.regularization.enabled:
@@ -443,6 +449,10 @@ class UnifiedPruningPipeline:
         final_metrics = self._evaluate(model, "final") if self._needs_evaluation() else None
         if final_metrics is not None:
             stages["final_evaluation"] = final_metrics
+        diagnostics = _model_diagnostics(model)
+        stages["post_pruning_diagnostics"] = diagnostics
+        if not diagnostics["finite"]:
+            raise PruningExecutionError("FAILED: pruned model contains NaN or Inf weights.")
 
         complexity_after = None
         if cfg.benchmark.params or cfg.benchmark.flops or cfg.targets.parameter_reduction is not None or cfg.targets.flops_reduction is not None:
@@ -482,9 +492,11 @@ class UnifiedPruningPipeline:
         ModelExporter.export_checkpoint(model, cfg.output_path, checkpoint)
         artifact_paths["checkpoint"] = cfg.output_path
         pruning_result.extra_metrics.update({"stages": stages, "run_dir": str(artifacts.run_dir)})
+        summary = _benchmark_summary(baseline_metrics, final_metrics, complexity_after, cfg.pruning.amount, diagnostics)
         artifact_paths["result"] = artifacts.write_json(
             "result.json",
             {
+                **summary,
                 "pruning": pruning_result,
                 "baseline_metrics": baseline_metrics,
                 "final_metrics": final_metrics,
@@ -595,3 +607,49 @@ def _sensitivity_to_dict(result) -> Dict[str, Any]:
             for index, profile in result.profiles.items()
         },
     }
+
+
+def _invalid_baseline_reason(cfg: FrameworkConfig, metrics: Dict[str, float]) -> str | None:
+    """Reject known-invalid random/native classification baselines before mutation."""
+    if any(not math.isfinite(float(value)) for value in metrics.values()):
+        return "baseline metrics contain NaN or Inf"
+    accuracy = metrics.get("accuracy")
+    # The native LeNet configs must not silently benchmark random weights on
+    # the 47-class dataset. A trained model is expected to clear this floor.
+    if cfg.model.name.lower() in {"lenet5", "lenet"} and cfg.dataset.name == "custom_47labels":
+        if str(cfg.model.weights).lower() in {"random", "none", ""}:
+            return "native LeNet-5 uses random/no weights for custom_47labels"
+        if accuracy is not None and accuracy < 0.5:
+            return f"native LeNet-5 accuracy {accuracy:.4f} is below required 0.50"
+    return None
+
+
+def _model_diagnostics(model: nn.Module) -> Dict[str, Any]:
+    layers, zero, total, nonfinite = {}, 0, 0, 0
+    for name, parameter in model.named_parameters():
+        value = parameter.detach()
+        count = value.numel()
+        zeros = int(value.eq(0).sum())
+        invalid = int((~torch.isfinite(value)).sum())
+        layers[name] = {"zero": zeros, "total": count, "sparsity_pct": 100.0 * zeros / max(1, count),
+                        "min": float(value.min()), "max": float(value.max()), "mean": float(value.mean()), "std": float(value.std()), "nan_inf": invalid}
+        zero += zeros; total += count; nonfinite += invalid
+    return {"finite": nonfinite == 0, "nan_inf": nonfinite, "actual_sparsity": zero / max(1, total),
+            "remaining_weight_pct": 100.0 * (total - zero) / max(1, total), "layers": layers}
+
+
+def _benchmark_summary(baseline, final, complexity, requested_sparsity, diagnostics) -> Dict[str, Any]:
+    baseline, final = baseline or {}, final or {}
+    deltas = {f"{name}_delta": final[name] - baseline[name] for name in ("accuracy", "loss", "precision", "recall", "map50", "map50_95") if name in baseline and name in final}
+    quality_key = "accuracy" if "accuracy_delta" in deltas else "map50_95"
+    drop = -deltas.get(f"{quality_key}_delta", 0.0)
+    detection = quality_key == "map50_95"
+    limits = (0.01, 0.03, 0.10, 0.20 if detection else 0.30)
+    epsilon = 1e-12
+    status = ("PASS" if drop <= limits[0] + epsilon else "GOOD" if drop <= limits[1] + epsilon else
+              "DEGRADED" if drop <= limits[2] + epsilon else "SEVERE" if drop <= limits[3] + epsilon else "FAILED")
+    if "map50_95_delta" in deltas:
+        deltas["map5095_delta"] = deltas["map50_95_delta"]
+    return {"baseline_valid": True, "requested_sparsity": requested_sparsity,
+            "actual_sparsity": diagnostics["actual_sparsity"], "status": status,
+            "failure_reason": None if status != "FAILED" else "quality collapse after pruning", **deltas}

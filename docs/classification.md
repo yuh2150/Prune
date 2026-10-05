@@ -15,6 +15,11 @@ dataset:
   val_limit: 256
 ```
 
+`custom_47labels` reads a flat local dataset laid out as `root/images/<name>.jpg` and
+`root/labels/<name>.txt`; each text file contains one integer in `0..46`. It converts
+images to grayscale, applies the regular classification transform, and creates a
+deterministic stratified train/validation split using `validation_fraction` (default `0.2`).
+
 The loader always sets `download=False`. A missing cache raises a clear error; it never downloads a dataset implicitly. `train_limit` and `val_limit` select deterministic subsets for smoke runs. EMNIST defaults to `balanced` (47 classes); set `model.num_classes` to the matching split count: `byclass: 62`, `bymerge: 47`, `balanced: 47`, `letters: 26`, `digits: 10`, or `mnist: 10`. The loader converts EMNIST `letters` labels from 1–26 to 0–25 for `CrossEntropyLoss`.
 
 `LeNet5_Numbers&Characters_FP32.onnx` is a separate 32x32 classic-LeNet topology with 47 output classes. Set `model.name: lenet5_emnist_onnx`, point `model.weights` at the ONNX file, use `model.input_shape: [1, 1, 32, 32]`, and set `dataset.image_padding: 2`. The adapter copies the verified ONNX initializers into the matching PyTorch model so sensitivity, pruning and recovery remain PyTorch operations.

@@ -42,7 +42,7 @@ class CompactMultiheadAttention(nn.Module):
         return out, returned if need_weights else None
 
 
-@register_pruner("attention_head")
+@register_pruner("compact_attention_head")
 class AttentionHeadPruner(BasePruner):
     def create_plan(self, model_adapter, criterion=None, granularity=None, config: Dict[str, Any] | None=None):
         config = config or {}; amount = config.get("amount", 0.25); plan = PruningPlan(pruner_name="attention_head")
