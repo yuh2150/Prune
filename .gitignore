@@ -196,3 +196,4 @@ coco/*
 datasets/coco128
 
 images/*
+artifacts/
