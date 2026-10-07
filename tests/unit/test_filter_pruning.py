@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 
 from prune_framework.contracts import BaseModelAdapter, TargetType
+from prune_framework.core.engine import PruningEngine
 from prune_framework.plugins.criteria.norm_criteria import L1NormCriterion
 from prune_framework.plugins.granularities.base import FilterGranularity
 from prune_framework.plugins.pruners.structured import StructuredPruner
@@ -18,6 +19,9 @@ class FilterFixture(nn.Module):
         super().__init__()
         self.producer = nn.Conv2d(4 if groups > 1 else 2, 4, 1, bias=True, groups=groups)
         self.consumer = nn.Conv2d(4, 3, 1, bias=False)
+        # Deliberately an adapter-approved structural target: sensitivity must
+        # nevertheless omit it for Conv-only filter pruning.
+        self.classifier = nn.Linear(3, 2)
 
     def forward(self, images):
         return self.consumer(torch.relu(self.producer(images)))
@@ -29,7 +33,7 @@ class FilterAdapter(BaseModelAdapter):
         raise NotImplementedError
 
     def get_pruneable_modules(self):
-        return [("producer", self.model.producer)]
+        return [("producer", self.model.producer), ("classifier", self.model.classifier)]
 
     def get_pruneable_blocks(self):
         return []
@@ -38,7 +42,7 @@ class FilterAdapter(BaseModelAdapter):
         return torch.randn(2, self.model.producer.in_channels, 5, 5, device=device)
 
     def supported_target_types(self):
-        return {TargetType.CONV_OUT_CHANNEL}
+        return {TargetType.CONV_OUT_CHANNEL, TargetType.LINEAR_OUT_FEATURE}
 
 
 class TestFilterPruning(unittest.TestCase):
@@ -78,6 +82,17 @@ class TestFilterPruning(unittest.TestCase):
         adapter = FilterAdapter(grouped)
         with self.assertRaisesRegex(ValueError, "grouped or depthwise"):
             self.pruner.create_plan(adapter, L1NormCriterion(), FilterGranularity(), {"amount": 0.5})
+
+    def test_engine_sensitivity_targets_match_filter_plan_targets(self):
+        # Construct the engine boundary directly so this guards the target
+        # indexing used by SensitivityAnalyzer, without registering a global
+        # test-only plugin.
+        engine = object.__new__(PruningEngine)
+        engine.adapter_cls = FilterAdapter
+        engine.pruner_cls = StructuredPruner
+        engine.criterion_cls = L1NormCriterion
+        engine.granularity_cls = FilterGranularity
+        self.assertEqual([target.name for target in engine.targets(self.model)], ["producer"])
 
 
 if __name__ == "__main__":

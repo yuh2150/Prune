@@ -154,6 +154,8 @@ data/
 /datasets/coco128/
 /datasets/imagenet1k_train_2000/
 /datasets/imagenet1k_val_1000/
+Dataset*/
+datasets/
 
 # Generated experiment artifacts and downloaded dataset archives stay local.
 

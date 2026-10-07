@@ -47,7 +47,9 @@ class TestYoloEvaluation(unittest.TestCase):
                                    imgsz=64, batch_size=1, plots=False, **kwargs)
 
     def test_contract_nonzero_metrics_and_absent_class(self):
-        results, maps, times = self.run_eval()
+        quality = {}
+        results, maps, times = self.run_eval(quality_metrics=quality)
+        self.assertEqual(quality, {"f1": 1., "num_samples": 1})
         self.assertIsInstance(results, tuple)
         self.assertEqual(len(results), 7)
         self.assertTrue(all(isinstance(x, float) for x in results))

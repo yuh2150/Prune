@@ -1,6 +1,8 @@
 """Torchvision ResNet-18 adapter for ImageNet classification pruning."""
 from __future__ import annotations
 
+import os
+import pickle
 from typing import Any, Iterable, List, Optional, Set, Tuple
 
 import torch
@@ -19,6 +21,15 @@ class ResNet18Adapter(BaseModelAdapter):
         from torchvision.models import ResNet18_Weights, resnet18
         if num_classes not in (None, 1000):
             raise ValueError("ImageNet-pretrained ResNet-18 requires num_classes=1000.")
+        if weights_path and os.path.isfile(weights_path):
+            try:
+                payload = torch.load(weights_path, map_location=device, weights_only=True)
+            except (TypeError, RuntimeError, pickle.UnpicklingError):
+                payload = torch.load(weights_path, map_location=device, weights_only=False)
+            model = payload.get("model", payload) if isinstance(payload, dict) else payload
+            if not isinstance(model, nn.Module):
+                raise TypeError("ResNet-18 framework checkpoints must contain a serialized model module.")
+            return model.to(device), payload if isinstance(payload, dict) else None
         weights = ResNet18_Weights.DEFAULT if str(weights_path).lower() in {"default", "imagenet1k", "imagenet-1k"} else None
         if weights is None:
             raise ValueError("ResNet18Adapter currently supports weights='DEFAULT' only.")

@@ -22,7 +22,7 @@ from prune_framework.core.experiment import ExperimentArtifacts, seed_everything
 from prune_framework.core.results import ExperimentResult, PlanBuildResult
 from prune_framework.modules.analysis.layer_selection import LayerSelectorModule
 from prune_framework.modules.analysis.sensitivity import SensitivityAnalyzer
-from prune_framework.modules.evaluation.benchmark import LatencyBenchmark
+from prune_framework.modules.evaluation.benchmark import LatencyBenchmark, attach_quality_metrics
 from prune_framework.modules.evaluation.complexity import measure_complexity
 from prune_framework.modules.evaluation.validator import ModelValidator
 from prune_framework.modules.export.exporter import ModelExporter
@@ -71,7 +71,7 @@ class UnifiedPruningPipeline:
             "m": cfg.pruning.m,
             "block_shape": cfg.pruning.block_shape,
         }
-        if cfg.sensitivity.enabled or cfg.pruning.layer_params is not None:
+        if (cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine)) or cfg.pruning.layer_params is not None:
             compatibility['pruning_params'] = cfg.pruning.layer_params or [(0, cfg.pruning.amount)]
         if cfg.sensitivity.enabled and cfg.regularization.enabled and cfg.regularization.term == 'l0_hard_concrete':
             raise ConfigValidationException('L0 forced indices cannot override sensitivity layer-wise policy')
@@ -89,8 +89,10 @@ class UnifiedPruningPipeline:
             stages.append("dependency_preflight")
         if calibration:
             stages.append("importance_calibration")
-        if cfg.sensitivity.enabled:
+        if cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine):
             stages.extend(["sensitivity_probes", "select_layer_ratios"])
+        else:
+            stages.append(f"technique_specific_{_policy_kind(engine)}_policy")
         stages.extend(["requested_policy", "build_validate_plan", "BUILD_PLAN_ONLY_STOP", "apply_plan", "architecture_validation"])
         if cfg.recovery.enabled:
             stages.append("recovery_callback")
@@ -101,9 +103,10 @@ class UnifiedPruningPipeline:
         if cfg.benchmark.enabled and cfg.benchmark.latency:
             stages.append("pytorch_latency_benchmark")
         stages.append("target_check")
+        stages.append("save_checkpoint_reload_validate")
         if cfg.export.wants_onnx():
-            stages.append("onnx_export")
-        stages.extend(["save_checkpoint", "save_result"])
+            stages.append("optional_onnx_export_validate")
+        stages.append("save_result")
         gaps = ["Callbacks, checkpoint, dataset and architecture compatibility are NOT executed by this dry-run."]
         if cfg.recovery.callback == 'experiments.yolov5:recover' and cfg.recovery.enabled:
             gaps.append("YOLO recovery requires a local training split or injected dataloader/loss; dry-run does not validate either.")
@@ -167,7 +170,7 @@ class UnifiedPruningPipeline:
             "m": cfg.pruning.m,
             "block_shape": cfg.pruning.block_shape,
         }
-        if cfg.sensitivity.enabled or cfg.pruning.layer_params is not None:
+        if (cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine)) or cfg.pruning.layer_params is not None:
             compatibility_config['pruning_params'] = cfg.pruning.layer_params or [(0, cfg.pruning.amount)]
         if cfg.sensitivity.enabled and cfg.regularization.enabled and cfg.regularization.term == 'l0_hard_concrete':
             raise ConfigValidationException('L0 forced indices cannot override sensitivity layer-wise policy')
@@ -300,11 +303,15 @@ class UnifiedPruningPipeline:
                 raise ConfigValidationException(
                     f"{cfg.model.name} exposes no safe higher-order-calibration targets for: {supported}."
                 )
-            calibration_result = HigherOrderCalibrationRunner(seed=calibration_context.seed if calibration_context is not None else cfg.pruning.calibration_seed).run(
+            calibration_result = HigherOrderCalibrationRunner(
+                seed=calibration_context.seed if calibration_context is not None else cfg.pruning.calibration_seed,
+                parameter_scope=calibration_context.parameter_scope if calibration_context is not None else cfg.pruning.parameter_scope,
+            ).run(
                 model=model,
                 targets=targets,
                 batches=calibration_batches(),
                 loss_fn=calibration_loss(),
+                batch_weights=calibration_context.batch_weights if calibration_context is not None else None,
             )
             calibration_summary = calibration_result.describe()
             artifact_paths["grasp_calibration"] = artifacts.write_json("grasp_calibration.json", calibration_summary)
@@ -346,7 +353,7 @@ class UnifiedPruningPipeline:
         selection_summary = None
         sensitivity_summary = None
         pruning_params = cfg.pruning.layer_params if cfg.pruning.layer_params is not None else cfg.pruning.amount
-        if cfg.sensitivity.enabled:
+        if cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine):
             self._require_evaluator("sensitivity analysis")
             analyzer = SensitivityAnalyzer(
                 model_name=cfg.model.name,
@@ -377,6 +384,20 @@ class UnifiedPruningPipeline:
             artifact_paths["sensitivity"] = artifacts.write_json("sensitivity.json", sensitivity_summary)
             artifact_paths["selection"] = artifacts.write_json("selection.json", selection_summary)
             stages["sensitivity"] = {"profiles": len(result.profiles), "selector": cfg.sensitivity.selector}
+        else:
+            # Each non-layerwise mechanism owns a valid policy domain: global
+            # saliency for unstructured, adapter structural scores for depth,
+            # head scores for attention and constrained patterns for N:M/block.
+            # Do not force these mechanisms through synthetic layer probes.
+            policy_kind = _policy_kind(engine)
+            selection_summary = {
+                "policy_kind": policy_kind,
+                "source": "technique_specific_scoring",
+                "global_pruning": cfg.pruning.global_pruning,
+                "amount": cfg.pruning.amount,
+            }
+            stages["technique_policy"] = selection_summary
+            artifact_paths["selection"] = artifacts.write_json("selection.json", selection_summary)
 
         stages["importance_estimation"] = {"criterion": active_criterion}
         requested_pruning_plan = {
@@ -413,6 +434,13 @@ class UnifiedPruningPipeline:
         if calibration_result is not None:
             if getattr(criterion_cls, "requires_synflow_calibration", False):
                 pruning_config["synflow_calibration"] = calibration_result
+                pruning_config["synflow_recalibrate"] = lambda: SynFlowCalibrationRunner().run(
+                    model=model, targets=targets,
+                    input_factory=lambda: adapter.get_synflow_input(device),
+                    output_reducer=adapter.reduce_synflow_output,
+                    snapshot_extra_state=adapter.snapshot_synflow_state,
+                    restore_extra_state=adapter.restore_synflow_state,
+                )
             elif getattr(criterion_cls, "requires_higher_order_calibration", False):
                 pruning_config["higher_order_calibration"] = calibration_result
             else:
@@ -466,6 +494,7 @@ class UnifiedPruningPipeline:
             benchmark = LatencyBenchmark(cfg.benchmark.warmup, cfg.benchmark.runs).benchmark(
                 model, adapter.get_dummy_input(device)
             )
+            attach_quality_metrics(benchmark, final_metrics)
             pruning_result.benchmark = benchmark
             stages["latency"] = asdict(benchmark)
 
@@ -479,18 +508,42 @@ class UnifiedPruningPipeline:
         if not target_check.reached:
             raise PruningExecutionError(f'Deployment targets not reached: {target_check.violations}; unavailable: {target_check.unavailable}')
 
-        if cfg.export.wants_onnx():
-            ModelExporter.export_onnx(
-                model,
-                adapter.get_dummy_input(device),
-                cfg.export.output_path,
-                opset_version=cfg.export.opset_version,
-            )
-            artifact_paths["onnx"] = cfg.export.output_path
-            stages["export"] = {"onnx": cfg.export.output_path}
-
         ModelExporter.export_checkpoint(model, cfg.output_path, checkpoint)
         artifact_paths["checkpoint"] = cfg.output_path
+        checkpoint_status = self._validate_checkpoint_artifact(cfg.output_path, device)
+        stages["artifact"] = {"checkpoint_saved": True, **checkpoint_status}
+        artifact_paths["artifact_validation"] = artifacts.write_json("artifact_validation.json", stages["artifact"])
+        if not checkpoint_status["checkpoint_reload_validated"]:
+            raise PruningExecutionError(
+                f"Checkpoint was saved but reload validation failed: {checkpoint_status['checkpoint_validation_reason']}"
+            )
+
+        export_status = {
+            "onnx_exported": False,
+            "onnx_validated": False,
+            "onnx_validation_status": "DISABLED",
+            "onnx_validation_reason": None,
+        }
+        if cfg.export.wants_onnx():
+            try:
+                export_status = ModelExporter.export_onnx(
+                    model,
+                    adapter.get_dummy_input(device),
+                    cfg.export.output_path,
+                    opset_version=cfg.export.opset_version,
+                )
+                artifact_paths["onnx"] = cfg.export.output_path
+            except Exception as exc:
+                # Checkpoint is deliberately saved first.  An optional ONNX
+                # failure is recorded as an artifact status, never allowed to
+                # erase the successfully-pruned PyTorch deliverable.
+                export_status = {
+                    "onnx_exported": False,
+                    "onnx_validated": False,
+                    "onnx_validation_status": "FAILED",
+                    "onnx_validation_reason": str(exc),
+                }
+        stages["export"] = export_status
         pruning_result.extra_metrics.update({"stages": stages, "run_dir": str(artifacts.run_dir)})
         summary = _benchmark_summary(baseline_metrics, final_metrics, complexity_after, cfg.pruning.amount, diagnostics)
         artifact_paths["result"] = artifacts.write_json(
@@ -594,6 +647,63 @@ class UnifiedPruningPipeline:
             raise TypeError("Recovery result 'model' must be an nn.Module.")
         return model, {key: item for key, item in value.items() if key != "model"}
 
+    def _validate_checkpoint_artifact(self, path: str, device: torch.device) -> Dict[str, Any]:
+        """Reload the emitted artifact through the public adapter boundary."""
+        try:
+            options = {"num_classes": self.config.model.num_classes} if self.config.model.num_classes is not None else {}
+            restored, _ = ModelLoader.load(self.config.model.name, path, device, **options)
+            engine = PruningEngine(
+                self.config.model.name,
+                self.config.pruning.pruner,
+                self.config.pruning.criterion,
+                self.config.pruning.granularity,
+            )
+            restored_adapter = engine.adapter_cls(restored)
+            forward_ok = ModelValidator.validate_forward(restored, restored_adapter.get_dummy_input(device))
+            if not forward_ok:
+                return {
+                    "checkpoint_reload_validated": False,
+                    "checkpoint_validation_reason": "reloaded model failed forward validation",
+                }
+            # The reloaded artifact is evaluated with the final evaluator contract.
+            # ``final`` is deliberately retained as the callback stage for backward
+            # compatibility; the enclosing artifact result identifies this pass as
+            # the reload validation rather than a second in-memory final metric.
+            reloaded_metrics = self._evaluate(restored, "final") if self._needs_evaluation() else None
+            return {
+                "checkpoint_reload_validated": True,
+                "checkpoint_validation_reason": None,
+                "reloaded_metrics": reloaded_metrics,
+            }
+        except Exception as exc:
+            return {
+                "checkpoint_reload_validated": False,
+                "checkpoint_validation_reason": f"{type(exc).__name__}: {exc}",
+            }
+
+
+def _policy_kind(engine: PruningEngine) -> str:
+    """Name the scoring/policy semantics without duplicating pruner logic."""
+    mode = engine.pruner_cls.pruning_mode
+    if mode == "structured":
+        return "structural_sensitivity"
+    if mode == "unstructured":
+        return "global_weight_score" if getattr(engine.criterion_cls, "global_selection", False) else "weight_score"
+    if mode == "depth":
+        return "adapter_structural_score"
+    if mode == "head":
+        return "attention_head_score"
+    if mode == "nm":
+        return "nm_pattern_score"
+    if mode == "block_sparse":
+        return "block_pattern_score"
+    return "pruner_defined_score"
+
+
+def _uses_layerwise_sensitivity(engine: PruningEngine) -> bool:
+    """Only mechanisms with a meaningful layer-ratio policy run generic probes."""
+    return engine.pruner_cls.pruning_mode == "structured"
+
 
 def _sensitivity_to_dict(result) -> Dict[str, Any]:
     return {
@@ -640,7 +750,7 @@ def _model_diagnostics(model: nn.Module) -> Dict[str, Any]:
 
 def _benchmark_summary(baseline, final, complexity, requested_sparsity, diagnostics) -> Dict[str, Any]:
     baseline, final = baseline or {}, final or {}
-    deltas = {f"{name}_delta": final[name] - baseline[name] for name in ("accuracy", "loss", "precision", "recall", "map50", "map50_95") if name in baseline and name in final}
+    deltas = {f"{name}_delta": final[name] - baseline[name] for name in ("accuracy", "loss", "precision", "recall", "f1", "map50", "map50_95") if name in baseline and name in final}
     quality_key = "accuracy" if "accuracy_delta" in deltas else "map50_95"
     drop = -deltas.get(f"{quality_key}_delta", 0.0)
     detection = quality_key == "map50_95"
@@ -652,4 +762,5 @@ def _benchmark_summary(baseline, final, complexity, requested_sparsity, diagnost
         deltas["map5095_delta"] = deltas["map50_95_delta"]
     return {"baseline_valid": True, "requested_sparsity": requested_sparsity,
             "actual_sparsity": diagnostics["actual_sparsity"], "status": status,
-            "failure_reason": None if status != "FAILED" else "quality collapse after pruning", **deltas}
+            "failure_reason": None if status != "FAILED" else "quality collapse after pruning",
+            **{name: final.get(name) for name in ("precision", "recall", "f1", "map50", "map50_95")}, **deltas}

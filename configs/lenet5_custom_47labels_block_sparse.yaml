@@ -1,6 +1,6 @@
 # Per-tensor unstructured [1,1] block-sparse masking -> benchmark.
 model: {name: lenet5_emnist_onnx, weights: LeNet5_Numbers&Characters_FP32.onnx, device: cpu, input_shape: [1, 1, 32, 32], num_classes: 47}
-dataset: {name: custom_47labels, root: ./Dataset_MNIST_47Labels_1000images, batch_size: 64, num_workers: 0, validation_fraction: 0.2, image_padding: 2}
+dataset: {name: custom_47labels, root: ./datasets/Dataset_MNIST_47Labels_1000images, batch_size: 64, num_workers: 0, validation_fraction: 0.2, image_padding: 2}
 pruning: {method: block_sparse, criterion: magnitude, structure: weight, target_ratio: 0.30, global_pruning: false, block_shape: [1, 1]}
 sensitivity: {enabled: false}
 evaluation: {enabled: true, callback: experiments.classification:evaluate, metric: accuracy}

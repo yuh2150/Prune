@@ -94,6 +94,12 @@ class NMSparsityPruner(BasePruner):
                     indices=[int(index) for index in pruned],
                     dependencies=[{"pattern": f"{n}:{m}", "axis": "input_dimension"}],
                 ))
+        if not plan.groups:
+            skipped = plan.metadata["skipped_incompatible_targets"]
+            details = ", ".join(
+                f"{entry['name']} input width {entry['input_width']}" for entry in skipped
+            ) or "no adapter-approved weight targets"
+            raise ValueError(f"N:M pruning requires at least one target whose input width is divisible by {m}; got {details}.")
         return plan
 
     def validate_plan(self, plan: PruningPlan, model_adapter: BaseModelAdapter, config=None) -> bool:

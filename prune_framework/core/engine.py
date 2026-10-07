@@ -40,7 +40,15 @@ class PruningEngine:
     def targets(self, model):
         adapter, pruner, criterion = self.adapter_cls(model), self.pruner_cls(), self.criterion_cls()
         if pruner.pruning_mode == "structured":
-            return pruner._structural_targets(adapter, criterion)
+            targets = pruner._structural_targets(adapter, criterion)
+            # Sensitivity indexes must be drawn from exactly the same target
+            # set used by StructuredPruner.create_plan.  Filter granularity is
+            # explicitly Conv2d-only, so exposing Linear targets here creates a
+            # policy that cannot be applied in the final plan.
+            granularity = self.granularity_cls()
+            if getattr(granularity, "conv_only", False):
+                targets = [target for target in targets if isinstance(target.module, nn.Conv2d)]
+            return targets
         if pruner.pruning_mode in {"unstructured", "nm", "block_sparse"}:
             # Constrained masks share the adapter-approved weight target
             # boundary with unstructured pruning; they do not expose their own

@@ -6,6 +6,7 @@ from typing import Any, Callable, Iterable
 import torch
 
 from prune_framework.contracts.evaluation import normalize_yolo_evaluation
+from prune_framework.contracts.evaluation import EvaluationResult
 from prune_framework.modules.calibration.context import CalibrationContext
 from prune_framework.modules.model.masks import MaskManager
 
@@ -14,9 +15,15 @@ def evaluate(model, data, dataloader=None, **kwargs):
     from test import test
     accepted = {'batch_size', 'imgsz', 'conf_thres', 'iou_thres', 'single_cls', 'half_precision'}
     options = {k: v for k, v in kwargs.items() if k in accepted}
-    value = test(data=data, model=model, dataloader=dataloader, plots=False, **options)
+    quality = {}
+    value = test(data=data, model=model, dataloader=dataloader, plots=False, quality_metrics=quality, **options)
     samples = len(dataloader.dataset) if dataloader is not None and hasattr(dataloader, 'dataset') else 0
-    return normalize_yolo_evaluation(value, samples)
+    result = normalize_yolo_evaluation(value, samples)
+    return EvaluationResult({**result.metrics, **({"f1": quality["f1"]} if "f1" in quality else {})},
+                            quality.get("num_samples", samples),
+                            {**result.metadata, "average": "macro", "f1_iou": 0.5,
+                             "operating_point": "maximum_macro_f1",
+                             "class_scope": "targets"})
 
 
 def calibrate_taylor(model, config, device, data=None, dataloader=None, **kwargs):

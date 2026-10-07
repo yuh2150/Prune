@@ -50,8 +50,8 @@ class TestFlowAudit(unittest.TestCase):
             'sensitivity': {'enabled': True},
             'benchmark': {'enabled': False, 'params': False, 'flops': False},
         })
-        with self.assertRaisesRegex(ValueError, 'does not support layer-wise'):
-            UnifiedPruningPipeline.describe_flow(cfg)
+        report = UnifiedPruningPipeline.describe_flow(cfg)
+        self.assertIn('technique_specific_global_weight_score_policy', report['configured_run_order'])
         cfg.sensitivity.enabled = False
         report = UnifiedPruningPipeline.describe_flow(cfg)
         for disabled in ('baseline_complexity', 'dependency_preflight', 'importance_calibration',

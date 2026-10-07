@@ -111,6 +111,53 @@ class TestSynFlowPruning(unittest.TestCase):
             self.assertEqual(tuple(first_score.shape), tuple(target.module.weight.shape))
             self.assertIsNone(first_score.grad_fn)
 
+    def test_recalibration_works_after_persistent_mask(self):
+        mask = torch.ones_like(self.model.conv.weight)
+        mask.flatten()[0] = 0
+        MaskManager.apply(self.model.conv, mask)
+        before = {k: v.clone() for k, v in self.model.state_dict().items()}
+        result = self._run_synflow()
+        self.assertEqual(float(result.gradients["conv"].flatten()[0]), 0)
+        self.assertGreater(float(result.gradients["conv"].abs().sum()), 0)
+        for k, v in self.model.state_dict().items():
+            self.assertTrue(torch.equal(v, before[k]))
+
+    def test_iterative_synflow_recomputes_and_restores_plan_only_model(self):
+        before = {k: v.clone() for k, v in self.model.state_dict().items()}
+        surviving_counts = []
+        def recalibrate():
+            surviving_counts.append(sum(int((t.module.weight != 0).sum()) for t in self.targets))
+            return self._run_synflow()
+        pruner = UnstructuredPruner()
+        plan = pruner.create_plan(self.adapter, SynFlowCriterion(), WeightGranularity(), {
+            "amount": .5, "iterative_steps": 5, "criterion_name": "synflow",
+            "synflow_recalibrate": recalibrate,
+        })
+        self.assertEqual(surviving_counts, [80, 70, 61, 53, 46])
+        self.assertEqual(plan.metadata["selected_elements"], 40)
+        self.assertEqual(len(plan.metadata["iterations"]), 5)
+        for k, v in self.model.state_dict().items():
+            self.assertTrue(torch.equal(v, before[k]))
+        self.assertTrue(pruner.validate_plan(plan, self.adapter))
+        pruner.apply_plan(plan, self.adapter)
+        self.assertEqual(sum(int((MaskManager.mask(t.module) == 0).sum()) for t in self.targets), 40)
+
+    def test_iterative_plan_restores_weights_when_recalibration_fails(self):
+        before = {k: v.clone() for k, v in self.model.state_dict().items()}
+        calls = 0
+        def failing():
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("calibration failed")
+            return self._run_synflow()
+        with self.assertRaisesRegex(RuntimeError, "calibration failed"):
+            UnstructuredPruner().create_plan(self.adapter, SynFlowCriterion(), WeightGranularity(), {
+                "amount": .5, "iterative_steps": 5, "synflow_recalibrate": failing,
+            })
+        for k, v in self.model.state_dict().items():
+            self.assertTrue(torch.equal(v, before[k]))
+
     def test_global_plan_has_exact_cardinality_and_masked_forward(self):
         result = self._run_synflow()
         pruner = UnstructuredPruner()
@@ -165,7 +212,7 @@ class TestSynFlowPruning(unittest.TestCase):
             config = FrameworkConfig.from_dict(
                 {
                     "model": {"name": "yolov5", "weights": "unused.pt", "device": "cpu"},
-                    "pruning": {"method": "unstructured", "criterion": "synflow", "structure": "weight", "target_ratio": 0.25},
+                    "pruning": {"method": "unstructured", "criterion": "synflow", "structure": "weight", "target_ratio": 0.25, "iterative_steps": 4},
                     "benchmark": {"enabled": False, "latency": False, "flops": False, "params": False, "runs": 1},
                     "export": {"enabled": False},
                     "experiment": {"name": "synflow", "output_dir": directory, "seed": 9},
@@ -178,6 +225,7 @@ class TestSynFlowPruning(unittest.TestCase):
                 result = UnifiedPruningPipeline(config).run()
             self.assertTrue(result.pruning.forward_verified)
             self.assertIn("synflow_calibration", result.artifacts)
+            self.assertEqual(result.pruning.pruning_plan["metadata"]["iterative_steps"], 4)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+# N:M sparsity is fixed by 1 - n/m: retain 7 of each 8 weights (12.5% pruned).
+model: {name: resnet18, weights: DEFAULT, device: cuda, input_shape: [1, 3, 224, 224], num_classes: 1000}
+dataset: {name: imagenet1k_subset, root: datasets/imagenet1k_val_1000, batch_size: 64, num_workers: 0}
+pruning: {method: nm, criterion: magnitude, structure: weight, n: 7, m: 8, target_ratio: 0.125}
+sensitivity: {enabled: false}
+evaluation: {enabled: true, callback: experiments.classification:evaluate, metric: accuracy}
+recovery: {enabled: false, epochs: 0}
+benchmark: {enabled: true, latency: true, flops: false, params: true, warmup: 10, runs: 30}
+export: {enabled: false, onnx: false}
+experiment: {name: resnet18_imagenet1000_nm_7of8, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/resnet18_imagenet1000_nm_7of8.pt

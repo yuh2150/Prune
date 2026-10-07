@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import pickle
 from typing import Any, Iterable, List, Optional, Set, Tuple
 
 import torch
@@ -98,9 +99,22 @@ class LeNet5EMNISTONNXAdapter(BaseModelAdapter):
     ) -> Tuple[nn.Module, Optional[Any]]:
         try:
             payload = torch.load(weights_path, map_location=device, weights_only=True)
-        except TypeError:
-            payload = torch.load(weights_path, map_location=device)
+        except (TypeError, RuntimeError, pickle.UnpicklingError):
+            # Structured pruning changes Conv/Linear dimensions.  Framework
+            # exports therefore retain the exact safe model topology alongside
+            # its state dict; load that topology instead of forcing original
+            # ONNX dimensions onto a pruned checkpoint.
+            payload = torch.load(weights_path, map_location=device, weights_only=False)
         state = payload.get("model", payload.get("state_dict", payload)) if isinstance(payload, dict) else payload
+        if isinstance(state, nn.Module):
+            checkpoint_classes = int(getattr(getattr(state, "fc2", None), "out_features", 0))
+            if checkpoint_classes < 1:
+                raise TypeError("Structured LeNet-5 checkpoint model is missing the final fc2 classifier.")
+            if num_classes is not None and num_classes != checkpoint_classes:
+                raise ValueError(
+                    f"LeNet-5 checkpoint has {checkpoint_classes} classes but model.num_classes={num_classes}."
+                )
+            return state.to(device), payload if isinstance(payload, dict) else None
         if not isinstance(state, dict):
             raise TypeError("LeNet-5 EMNIST checkpoint must contain a model state dict.")
         weight = state.get("fc2.weight")

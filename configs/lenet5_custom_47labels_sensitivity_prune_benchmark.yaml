@@ -8,7 +8,7 @@ model:
 
 dataset:
   name: custom_47labels
-  root: ./Dataset_MNIST_47Labels_1000images
+  root: ./datasets/Dataset_MNIST_47Labels_1000images
   batch_size: 64
   num_workers: 0
   validation_fraction: 0.2

@@ -119,6 +119,34 @@ Callback `pruning.calibration_callback` trả context một lần. `loss_fn(cand
 
 Runners khôi phục gradients, mode, requires-grad, buffers và RNG mà chúng quản lý sau calibration. Chúng không thay thế trách nhiệm kiểm soát randomness trong callback tùy chỉnh.
 
+### GraSP trên LeNet5 đã train
+
+`grasp` giữ signed score `-W * (H @ g)` và bỏ score cao nhất, cùng chiều
+ranking với [implementation của tác giả](https://github.com/alecwangcq/GraSP/blob/master/pruner/GraSP.py#L129-L142).
+Trên checkpoint ONNX LeNet5 hiện có, score scale lệch giữa các lớp; chỉ
+chuẩn hóa mean_abs từng lớp vẫn làm accuracy giảm mạnh khi prune đồng thời.
+
+Config [lenet5_custom_47labels_grasp.yaml](../configs/lenet5_custom_47labels_grasp.yaml)
+dùng `grasp_magnitude_guarded`, một hybrid cho model pretrained:
+
+1. Chọn nhóm weights có magnitude nhỏ nhất toàn model, kích thước
+   `round(total_eligible * min(1, 1.5 * target_ratio))`.
+2. Chuẩn hóa signed GraSP score từng lớp bằng `mean(abs(score))`.
+3. Bỏ score cao nhất trong nhóm ứng viên, đúng ngân sách
+   `round(total_eligible * target_ratio)`. Ties theo adapter target order rồi
+   flattened index; không phụ thuộc thứ tự magnitude trong nhóm.
+
+Plan lưu raw/normalized score statistics và `metadata.magnitude_guard`
+(số ứng viên từng lớp, multiplier, magnitude lớn nhất được phép bỏ).
+Classifier/bias được bảo vệ theo adapter. Build-plan-only không đổi weights.
+GraSP gốc dùng config `lenet5_custom_47labels_grasp_reference.yaml`.
+
+[Benchmark cùng split seed 42](../artifacts/grasp_guarded_comparison_20261006/comparison.md):
+prune 30% eligible weights, accuracy 84% → 83.5% không fine-tune, Conv1
+bỏ 3/150 weights (2%). Đây là kết quả 200 ảnh validation, chưa chứng minh
+tổng quát hoặc tốt hơn magnitude. Khi `target_ratio >= 2/3`, nhóm ứng viên
+phủ toàn bộ weights và guard không còn giới hạn magnitude.
+
 `experiments.yolov5:calibrate_taylor` nhận local data YAML hoặc dataloader, lấy số batch cấu hình, chuẩn hóa ảnh và dùng YOLO `ComputeLoss`. Checkpoint phải có loss hyperparameters `model.hyp`. Đường fallback calibration YOLO dùng ảnh ngẫu nhiên/empty labels không đại diện dataset; không dùng nó làm bằng chứng experimental.
 
 ## Compatibility matrix
@@ -132,6 +160,7 @@ Bảng dựa trên [criterion metadata](../prune_framework/contracts/criterion.p
 | Taylor | Không | Có | Không | Có | Có | Có | Hạn chế** | `taylor`, `taylor_first_order` |
 | SNIP | Có | Không | Không | Có | Có | Có | Có | Intrinsic global selection |
 | GraSP | Có | Không | Không | Có | Có, higher-order | Có | Có | Intrinsic global selection |
+| GraSP magnitude guarded | Có | Không | Không | Có | Có, higher-order | Có | Có | Hybrid pretrained; magnitude shortlist + normalized signed GraSP |
 | SynFlow | Có | Không | Không | Không, synthetic input | Có | Có | Có | Intrinsic global selection |
 | LAMP | Có | Không | Không | Không | Không | Có | Có | Intrinsic global selection |
 | BN scale / BN-L1 | Không | Có | Không | Không để score | Không để score | Conv-BN | Không | Cần BN ownership |

@@ -1,0 +1,1492 @@
+{
+  "completed_utc": "2026-10-07T04:07:58.128309+00:00",
+  "detection_report": "outputs/benchmark-quality-20261007/yolo_quality_reevaluation.json",
+  "runs": [
+    {
+      "model": "lenet5",
+      "reason": "FileNotFoundError: MNIST is not available in local cache './data/mnist'; download it explicitly before running.",
+      "source": "artifacts/artifacts/lenet5_block_sparse_smoke_20261005T103435654242Z/result.json",
+      "status": "unavailable"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8608845494714078,
+        "loss": 0.41075104631483556,
+        "precision": 0.8984098713135008,
+        "recall": 0.8781630898652174
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261004T175924678135Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.845,
+        "f1": 0.8679611122360283,
+        "loss": 0.398751781694591,
+        "precision": 0.9032808868228143,
+        "recall": 0.884691136286881
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105713722145Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8608845494714078,
+        "loss": 0.41075104631483556,
+        "precision": 0.8984098713135008,
+        "recall": 0.8781630898652174
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105719478440Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8531936588017937,
+        "loss": 0.4459179013967514,
+        "precision": 0.8918929839455496,
+        "recall": 0.8730051272604464
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105725428890Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.75,
+        "f1": 0.7204023557215047,
+        "loss": 0.8869262194633484,
+        "precision": 0.7602024852494188,
+        "recall": 0.7409927542906266
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105731343978Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8572225277802709,
+        "loss": 0.41716632548719645,
+        "precision": 0.8945843823816289,
+        "recall": 0.8751650241011942
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_filter_20261004T175901449090Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8572225277802709,
+        "loss": 0.41716632548719645,
+        "precision": 0.8945843823816289,
+        "recall": 0.8751650241011942
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_filter_20261005T105832810978Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0004213187276174426,
+        "loss": 17.75492691040039,
+        "precision": 0.0002127659574468085,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261004T175521588101Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0004213187276174426,
+        "loss": 19.92415596008301,
+        "precision": 0.0002127659574468085,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105601807827Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0004213187276174426,
+        "loss": 24.387664184570312,
+        "precision": 0.0002127659574468085,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105608022603Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0004213187276174426,
+        "loss": 24.40382026672363,
+        "precision": 0.0002127659574468085,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105614227642Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0004213187276174426,
+        "loss": 24.799918518066406,
+        "precision": 0.0002127659574468085,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105620438617Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.025,
+        "f1": 0.004330882867289288,
+        "loss": 10.004558277130126,
+        "precision": 0.0023070727288285035,
+        "recall": 0.0425531914893617
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132435297346Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.02,
+        "f1": 0.004366170099652743,
+        "loss": 14.361642532348633,
+        "precision": 0.0023794536069495155,
+        "recall": 0.0425531914893617
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132442661084Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.02,
+        "f1": 0.002902714187389652,
+        "loss": 15.830270652770997,
+        "precision": 0.001524341324091011,
+        "recall": 0.0425531914893617
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132449864694Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0004213187276174426,
+        "loss": 20.84886184692383,
+        "precision": 0.0002127659574468085,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132457161774Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0004213187276174426,
+        "loss": 23.473191757202148,
+        "precision": 0.0002127659574468085,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_diagnostic_10_20261005T114802308297Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.6,
+        "f1": 0.5264754103956711,
+        "loss": 1.6087598490715027,
+        "precision": 0.5389431768342907,
+        "recall": 0.6198036596972768
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132352606811Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.16,
+        "f1": 0.09116917498971151,
+        "loss": 6.956383895874024,
+        "precision": 0.09989565202331159,
+        "recall": 0.15656028368794325
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132359883482Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.055,
+        "f1": 0.030295789139818317,
+        "loss": 11.42068229675293,
+        "precision": 0.04984565698851413,
+        "recall": 0.0927143778207608
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132407169718Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.02,
+        "f1": 0.0018866867166047112,
+        "loss": 16.84549327850342,
+        "precision": 0.0009671179883945841,
+        "recall": 0.0425531914893617
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132414704082Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.86431151103898,
+        "loss": 0.40246487364172934,
+        "precision": 0.8999101440903693,
+        "recall": 0.8808226643333026
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261004T175529188603Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8627457009625316,
+        "loss": 0.40879042852669956,
+        "precision": 0.8999101440903693,
+        "recall": 0.8800973258420066
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105649592221Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.86431151103898,
+        "loss": 0.40246487364172934,
+        "precision": 0.8999101440903693,
+        "recall": 0.8808226643333026
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105655275836Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.85,
+        "f1": 0.8782597377531641,
+        "loss": 0.40222958728671077,
+        "precision": 0.9086142059859207,
+        "recall": 0.8952096957416107
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105700996686Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8404310077412703,
+        "loss": 0.4603264892101288,
+        "precision": 0.8651959221421048,
+        "recall": 0.8656320039298764
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105706835744Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.01,
+        "f1": 0.0008426374552348852,
+        "loss": 3.8555597114562987,
+        "precision": 0.000425531914893617,
+        "recall": 0.0425531914893617
+      },
+      "final": {
+        "accuracy": 0.01,
+        "f1": 0.0008447076140773451,
+        "loss": 3.8561813545227053,
+        "precision": 0.0004265984109209193,
+        "recall": 0.0425531914893617
+      },
+      "model": "lenet5",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_magnitude_20261004T173606779376Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8608845494714078,
+        "loss": 0.41075104631483556,
+        "precision": 0.8984098713135008,
+        "recall": 0.8781630898652174
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_magnitude_20261004T175510991100Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8608845494714078,
+        "loss": 0.41075104631483556,
+        "precision": 0.8984098713135008,
+        "recall": 0.8781630898652174
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_magnitude_20261005T104903515445Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.01,
+        "f1": 0.0008426374552348852,
+        "loss": 3.8555597114562987,
+        "precision": 0.000425531914893617,
+        "recall": 0.0425531914893617
+      },
+      "final": {
+        "accuracy": 0.005,
+        "f1": 0.0002875215641173088,
+        "loss": 3.8550503063201904,
+        "precision": 0.00014473874656245476,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_sensitivity_prune_benchmark_20261004T122118813550Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.76,
+        "f1": 0.7357077681498153,
+        "loss": 0.6684704741835594,
+        "precision": 0.7538109054066502,
+        "recall": 0.7769035338184276
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_sensitivity_prune_benchmark_20261004T174711335706Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4088292495533824,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261004T175517809910Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4096728913486004,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105537115972Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.40882906172424555,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105543092194Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4078044670447707,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105549496193Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.825,
+        "f1": 0.8036023830056923,
+        "loss": 0.44499983206391336,
+        "precision": 0.85947043500235,
+        "recall": 0.8184044088299407
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105555518523Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8608845494714078,
+        "loss": 0.4100720141455531,
+        "precision": 0.8984098713135008,
+        "recall": 0.8781630898652174
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261004T175525444566Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8636650344316248,
+        "loss": 0.4096374397352338,
+        "precision": 0.9047227074135711,
+        "recall": 0.8802585121734059
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105626496785Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8608845494714078,
+        "loss": 0.4100720141455531,
+        "precision": 0.8984098713135008,
+        "recall": 0.8781630898652174
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105632215490Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.8683236824424557,
+        "loss": 0.4064556285738945,
+        "precision": 0.905340883563662,
+        "recall": 0.8843526449909429
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105637994653Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.85,
+        "f1": 0.856824476017819,
+        "loss": 0.45557633399963376,
+        "precision": 0.8896678473946111,
+        "recall": 0.8712735255288447
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105643786354Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.795,
+        "f1": 0.7987438615882065,
+        "loss": 0.5058866487443447,
+        "precision": 0.8269416857652152,
+        "recall": 0.8173114119922631
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_taylor_20261004T175905273546Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8572225277802709,
+        "loss": 0.41716632548719645,
+        "precision": 0.8945843823816289,
+        "recall": 0.8751650241011942
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/artifacts/lenet5_custom_47labels_taylor_20261005T105918933329Z/result.json",
+      "status": "updated"
+    },
+    {
+      "model": "resnet18",
+      "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
+      "source": "artifacts/artifacts/resnet18_imagenet1000_channel_20261005T140621875598Z/result.json",
+      "status": "unavailable"
+    },
+    {
+      "model": "resnet18",
+      "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
+      "source": "artifacts/artifacts/resnet18_imagenet1000_filter_20261005T140517089841Z/result.json",
+      "status": "unavailable"
+    },
+    {
+      "model": "resnet18",
+      "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
+      "source": "artifacts/artifacts/resnet18_imagenet1000_nm_2of4_20261005T070328534534Z/result.json",
+      "status": "unavailable"
+    },
+    {
+      "model": "resnet18",
+      "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
+      "source": "artifacts/artifacts/resnet18_imagenet1000_residual_block_20261005T073119777136Z/result.json",
+      "status": "unavailable"
+    },
+    {
+      "model": "resnet18",
+      "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
+      "source": "artifacts/artifacts/resnet18_imagenet1000_taylor_20261005T140656976815Z/result.json",
+      "status": "unavailable"
+    },
+    {
+      "model": "resnet18",
+      "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
+      "source": "artifacts/artifacts/resnet18_imagenet1000_taylor_sensitivity_20261005T144127316559Z/result.json",
+      "status": "unavailable"
+    },
+    {
+      "baseline": {
+        "box_loss": 0.0,
+        "cls_loss": 0.0,
+        "f1": 0.5317914927560605,
+        "inference_ms": 138.48691082000732,
+        "map": 0.3899042654763899,
+        "map50": 0.5355995046543808,
+        "map50_95": 0.3899042654763899,
+        "nms_ms": 5.121631622314453,
+        "obj_loss": 0.0,
+        "precision": 0.5981243881731775,
+        "recall": 0.5095725112085896,
+        "total_ms": 143.60854244232178
+      },
+      "final": {
+        "box_loss": 0.0,
+        "cls_loss": 0.0,
+        "f1": 0.4168250481774288,
+        "inference_ms": 168.71940994262695,
+        "map": 0.27432261627563675,
+        "map50": 0.40116206778050423,
+        "map50_95": 0.27432261627563675,
+        "nms_ms": 6.945860862731934,
+        "obj_loss": 0.0,
+        "precision": 0.5265492045993065,
+        "recall": 0.381155494068167,
+        "total_ms": 175.6652708053589
+      },
+      "model": "yolov5",
+      "num_samples": 500,
+      "source": "artifacts/artifacts/yolov5s_depth_sensitivity_20261004T190600657310Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "box_loss": 0.0,
+        "cls_loss": 0.0,
+        "f1": 0.5317914927560605,
+        "inference_ms": 138.48691082000732,
+        "map": 0.3899042654763899,
+        "map50": 0.5355995046543808,
+        "map50_95": 0.3899042654763899,
+        "nms_ms": 5.121631622314453,
+        "obj_loss": 0.0,
+        "precision": 0.5981243881731775,
+        "recall": 0.5095725112085896,
+        "total_ms": 143.60854244232178
+      },
+      "final": {
+        "box_loss": 0.0,
+        "cls_loss": 0.0,
+        "f1": 0.5280006325121622,
+        "inference_ms": 179.58990812301636,
+        "map": 0.38521925696144005,
+        "map50": 0.528052022843548,
+        "map50_95": 0.38521925696144005,
+        "nms_ms": 5.594133377075195,
+        "obj_loss": 0.0,
+        "precision": 0.6070635353652825,
+        "recall": 0.4952040144615063,
+        "total_ms": 185.18404150009155
+      },
+      "model": "yolov5",
+      "num_samples": 500,
+      "source": "artifacts/artifacts/yolov5s_filter_channel_global_10_20261004T194857725304Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "box_loss": 0.0,
+        "cls_loss": 0.0,
+        "f1": 0.5317914927560605,
+        "inference_ms": 138.48691082000732,
+        "map": 0.3899042654763899,
+        "map50": 0.5355995046543808,
+        "map50_95": 0.3899042654763899,
+        "nms_ms": 5.121631622314453,
+        "obj_loss": 0.0,
+        "precision": 0.5981243881731775,
+        "recall": 0.5095725112085896,
+        "total_ms": 143.60854244232178
+      },
+      "final": {
+        "box_loss": 0.0,
+        "cls_loss": 0.0,
+        "f1": 0.2736877429249881,
+        "inference_ms": 180.882315158844,
+        "map": 0.19070940901211433,
+        "map50": 0.2946586295114612,
+        "map50_95": 0.19070940901211433,
+        "nms_ms": 3.9242224693298344,
+        "obj_loss": 0.0,
+        "precision": 0.5163353979257456,
+        "recall": 0.26244222114619903,
+        "total_ms": 184.80653762817383
+      },
+      "model": "yolov5",
+      "num_samples": 500,
+      "source": "artifacts/artifacts/yolov5s_taylor_channel_global_10_20261004T201756236853Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.235,
+        "f1": 0.1034787815597013,
+        "loss": 13.88906120300293,
+        "precision": 0.16412304236600733,
+        "recall": 0.11876285652881398
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_01_20261006T045953487963Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.045,
+        "f1": 0.0029963826938961525,
+        "loss": 91.17839416503907,
+        "precision": 0.0016523391153070656,
+        "recall": 0.023936170212765957
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_05_20261006T045954004014Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.05,
+        "f1": 0.004167407061024082,
+        "loss": 167.45960205078126,
+        "precision": 0.0022654721449902175,
+        "recall": 0.026595744680851064
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_10_20261006T045954470099Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.285,
+        "f1": 0.17387852852958882,
+        "loss": 10.468681640625,
+        "precision": 0.25412912204557253,
+        "recall": 0.18180743606275523
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_conv1_capped_01_20261006T045957389339Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.04,
+        "f1": 0.0020263424518743665,
+        "loss": 83.49233596801758,
+        "precision": 0.0010638297872340426,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_conv1_capped_05_20261006T045957978446Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.055,
+        "f1": 0.004675878365485619,
+        "loss": 157.38528259277345,
+        "precision": 0.002553191489361702,
+        "recall": 0.02925531914893617
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_conv1_capped_10_20261006T045958454084Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.695,
+        "f1": 0.5809809728583196,
+        "loss": 1.3468833255767823,
+        "precision": 0.6341776403119529,
+        "recall": 0.6051518221730987
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_layer_normalized_01_20261006T045954966873Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.13,
+        "f1": 0.059276977660076634,
+        "loss": 21.31004341125488,
+        "precision": 0.11611001040607198,
+        "recall": 0.09115010285223052
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_layer_normalized_05_20261006T045955411813Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.045,
+        "f1": 0.005282964249529599,
+        "loss": 81.5749789428711,
+        "precision": 0.022181982797645994,
+        "recall": 0.023210831721470017
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_grasp_layer_normalized_10_20261006T045955903702Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097575218975544,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_magnitude_01_20261006T045956536590Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.40966528467833996,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_magnitude_05_20261006T045956795629Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8595110324052825,
+        "loss": 0.40857193220406773,
+        "precision": 0.8994035584774008,
+        "recall": 0.8783242761966167
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_comparison_magnitude_10_20261006T045957071748Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8364947212310764,
+        "loss": 0.42703799523413183,
+        "precision": 0.8745870535937067,
+        "recall": 0.8554504006631665
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_custom_47labels_grasp_magnitude_guarded_20261006T092309048612Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.04,
+        "f1": 0.0019125029882859192,
+        "loss": 252.20100151062013,
+        "precision": 0.0010012515644555694,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_custom_47labels_grasp_pure_30_20261006T100455443769Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.06,
+        "f1": 0.004628940799153566,
+        "loss": 162.55650970458984,
+        "precision": 0.0024968199865720853,
+        "recall": 0.031914893617021274
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_custom_47labels_grasp_reference_10_20261006T040553814313Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.04,
+        "f1": 0.0017730496453900709,
+        "loss": 254.85373123168947,
+        "precision": 0.0009250693802035152,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_custom_47labels_grasp_reference_20261006T040300687515Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.05,
+        "f1": 0.004167407061024082,
+        "loss": 167.45960205078126,
+        "precision": 0.0022654721449902175,
+        "recall": 0.026595744680851064
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_grasp_10_20261006T092239511272Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.04,
+        "f1": 0.0019125029882859192,
+        "loss": 252.20100151062013,
+        "precision": 0.0010012515644555694,
+        "recall": 0.02127659574468085
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_grasp_30_20261006T092242368035Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097571016848087,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_grasp_magnitude_guarded_01_20261006T092242970023Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4093396106734872,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_grasp_magnitude_guarded_05_20261006T092243492565Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.825,
+        "f1": 0.8589158947591921,
+        "loss": 0.40960963901132347,
+        "precision": 0.8974746363357127,
+        "recall": 0.8762288538884283
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_grasp_magnitude_guarded_10_20261006T092244013215Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8364947212310764,
+        "loss": 0.42703799523413183,
+        "precision": 0.8745870535937067,
+        "recall": 0.8554504006631665
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_grasp_magnitude_guarded_30_20261006T092244551376Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.83,
+        "f1": 0.8595110324052825,
+        "loss": 0.40857193220406773,
+        "precision": 0.8994035584774008,
+        "recall": 0.8783242761966167
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_magnitude_10_20261006T092245162475Z/result.json",
+      "status": "updated"
+    },
+    {
+      "baseline": {
+        "accuracy": 0.84,
+        "f1": 0.866899702988874,
+        "loss": 0.4097635335847735,
+        "precision": 0.9052292930265395,
+        "recall": 0.8820315618187958
+      },
+      "final": {
+        "accuracy": 0.835,
+        "f1": 0.8628902891591185,
+        "loss": 0.4090681917965412,
+        "precision": 0.8975989800770777,
+        "recall": 0.8808226643333026
+      },
+      "model": "lenet5_emnist_onnx",
+      "num_samples": 200,
+      "source": "artifacts/lenet5_guarded_comparison_magnitude_30_20261006T092245423573Z/result.json",
+      "status": "updated"
+    }
+  ],
+  "timestamp_utc": "2026-10-07T03:58:31.407233+00:00",
+  "write": true
+}

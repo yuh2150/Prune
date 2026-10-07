@@ -18,7 +18,7 @@ pruning:
   criterion: taylor
   structure: filter
   # Used only as the per-layer upper bound by the selector after the probes.
-  target_ratio: 0.10
+  target_ratio: 0.05
   global_pruning: false
   min_channels: 2
   calibration_callback: experiments.classification:calibrate
@@ -28,7 +28,7 @@ pruning:
 
 sensitivity:
   enabled: true
-  rates: [0.01, 0.03, 0.05, 0.10]
+  rates: [0.01, 0.03, 0.05]
   selector: sensitivity
   max_allowed_relative_drop: 0.05
   metric_direction: higher_is_better
@@ -54,7 +54,9 @@ export:
   enabled: false
 
 experiment:
-  name: resnet18_imagenet1000_taylor_sensitivity
+  name: resnet18_imagenet1000_taylor_sensitivity_05
   output_dir: artifacts
   seed: 42
   deterministic: true
+
+output_path: artifacts/resnet18_imagenet1000_taylor_sensitivity_05.pt

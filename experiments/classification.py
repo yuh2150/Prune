@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 from typing import Any, Iterable
 
 import torch
@@ -18,27 +19,39 @@ def _loaders(config):
     return create_classification_dataloaders(config.dataset, seed=config.experiment.seed)
 
 
-def _loss(model: nn.Module, batch: Any, device: torch.device) -> torch.Tensor:
+def _loss(model: nn.Module, batch: Any, device: torch.device, temperature: float = 1.0) -> torch.Tensor:
     images, labels = batch
     images = images.to(device=device, dtype=next(model.parameters()).dtype)
     labels = labels.to(device=device, dtype=torch.long)
-    return nn.CrossEntropyLoss()(model(images), labels)
+    return nn.CrossEntropyLoss()(model(images) / temperature, labels)
 
 
-def calibrate(model, config, device, dataloader: Iterable | None = None, **_unused) -> CalibrationContext:
+def calibrate(model, config, device, dataloader: Iterable | None = None,
+              temperature: float = 1.0, microbatch_size: int | None = None,
+              parameter_scope: str | None = None, **_unused) -> CalibrationContext:
     """Provide fixed classification batches and scalar CrossEntropy calibration loss."""
+    temperature = float(temperature)
+    if not math.isfinite(temperature) or temperature <= 0:
+        raise ValueError("Calibration temperature must be finite and positive.")
+    if microbatch_size is not None and (not isinstance(microbatch_size, int) or microbatch_size < 1):
+        raise ValueError("Calibration microbatch_size must be a positive integer.")
     if dataloader is None:
         dataloader = _loaders(config).train
     batches = list(itertools.islice(dataloader, config.pruning.calibration_batches))
     if not batches:
         raise ValueError("Classification calibration requires at least one training batch.")
+    if microbatch_size is not None:
+        batches = [(images[start:start + microbatch_size], labels[start:start + microbatch_size])
+                   for images, labels in batches for start in range(0, len(labels), microbatch_size)]
     device = torch.device(device)
     return CalibrationContext(
         batches=batches,
-        loss_fn=lambda candidate, batch: _loss(candidate, batch, device),
+        loss_fn=lambda candidate, batch: _loss(candidate, batch, device, temperature),
         seed=config.pruning.calibration_seed,
         sample_count=sum(labels.numel() for _, labels in batches),
         device=str(device),
+        parameter_scope=parameter_scope or getattr(config.pruning, "parameter_scope", "weights"),
+        batch_weights=[float(labels.numel()) for _, labels in batches],
     ).validate()
 
 

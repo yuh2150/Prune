@@ -72,6 +72,15 @@ class TestSNIPPruning(unittest.TestCase):
             self.model, self.targets, [self.images], self.loss_fn
         )
 
+    def test_snip_calibration_reads_original_parameter_after_masking(self):
+        mask = torch.ones_like(self.model.conv.weight)
+        mask.flatten()[0] = 0
+        MaskManager.apply(self.model.conv, mask)
+        result = self._calibrate()
+        self.assertEqual(float(result.gradients["conv"].flatten()[0]), 0)
+        self.assertGreater(float(result.gradients["conv"].abs().sum()), 0)
+        self.assertIsNone(MaskManager.original_weight(self.model.conv).grad)
+
     def test_snip_matches_elementwise_reference_for_conv_and_linear(self):
         self.model.eval()
         prior_state = {name: value.detach().clone() for name, value in self.model.state_dict().items()}

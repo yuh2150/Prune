@@ -38,7 +38,7 @@ def evaluate(data, weights=None, batch_size=32, imgsz=640, conf_thres=0.001,
              save_txt=False, save_hybrid=False, save_conf=False, plots=True,
              wandb_logger=None, compute_loss=None, half_precision=True,
              trace=False, is_coco=False, v5_metric=False, pruning_params=None,
-             criterion=0, opt=None):
+             criterion=0, opt=None, quality_metrics=None):
     """Validate local YOLO checkpoints or an in-memory training/EMA model.
 
     Returns (results, maps, times): seven floats (P, R, AP50, AP50:95,
@@ -47,6 +47,8 @@ def evaluate(data, weights=None, batch_size=32, imgsz=640, conf_thres=0.001,
     Classes absent from validation inherit aggregate mAP, as expected by
     train.py's image weighting. Loss is zero when no loss callback is supplied.
     AP uses the repository's ap_per_class implementation, not COCOeval.
+    Optional quality_metrics receives macro F1 at the same IoU-0.5 operating
+    point as P/R, plus the image count, without changing the legacy tuple.
     Legacy trace/wandb arguments are accepted; inference remains eager.
     """
     if pruning_params:
@@ -172,13 +174,14 @@ def evaluate(data, weights=None, batch_size=32, imgsz=640, conf_thres=0.001,
     if not seen:
         raise ValueError('Validation dataloader yielded no images')
     tp, conf, pred_cls, target_cls = [np.concatenate(x, axis=0) for x in zip(*stats)]
-    mp = mr = map50 = mean_ap = 0.0
+    mp = mr = mf1 = map50 = mean_ap = 0.0
     maps = np.zeros(nc)
     if len(target_cls):
-        _, _, p, r, _, ap, classes = ap_per_class(
+        _, _, p, r, f1, ap, classes = ap_per_class(
             tp, conf, pred_cls, target_cls, plot=plots and bool(tp.any()),
             save_dir=save_dir, names=names, v5_metric=v5_metric)
         mp, mr, map50, mean_ap = float(p.mean()), float(r.mean()), float(ap[:, 0].mean()), float(ap.mean())
+        mf1 = float(f1.mean())
         maps[:] = mean_ap
         maps[classes] = ap.mean(1)
         if verbose:
@@ -191,7 +194,9 @@ def evaluate(data, weights=None, batch_size=32, imgsz=640, conf_thres=0.001,
     inference_ms, nms_ms = (elapsed / seen * 1000).tolist()
     times = (inference_ms, nms_ms, inference_ms + nms_ms, imgsz, imgsz, batch_size)
     results = (mp, mr, map50, mean_ap, *(loss / batches).cpu().tolist())
-    print(f'Images={seen} P={mp:.5f} R={mr:.5f} mAP@0.5={map50:.5f} mAP@0.5:0.95={mean_ap:.5f}')
+    if quality_metrics is not None:
+        quality_metrics.update(f1=mf1, num_samples=seen)
+    print(f'Images={seen} P={mp:.5f} R={mr:.5f} F1={mf1:.5f} mAP@0.5={map50:.5f} mAP@0.5:0.95={mean_ap:.5f}')
     print(f'Inference={inference_ms:.3f} ms/image NMS={nms_ms:.3f} ms/image')
     return results, maps, times
 
@@ -221,6 +226,7 @@ def test(data,
          pruning_params=None,
          criterion=0,
          opt=None,
+         quality_metrics=None,
          ):
     # Resolve opt if not passed
     if opt is None:
@@ -230,6 +236,7 @@ def test(data,
             pass
 
     return evaluate(
+        quality_metrics=quality_metrics,
         data=data,
         weights=weights,
         batch_size=batch_size,

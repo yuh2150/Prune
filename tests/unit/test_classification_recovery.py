@@ -13,6 +13,7 @@ from prune_framework.core.engine import PruningEngine
 from prune_framework.models import LeNet5
 from prune_framework.modules.model.masks import MaskManager
 from prune_framework.modules.model.loader import ModelLoader
+from prune_framework.modules.export.exporter import ModelExporter
 from prune_framework.modules.evaluation.classification import evaluate_classification
 from prune_framework.pipelines.unified import UnifiedPruningPipeline
 
@@ -38,6 +39,23 @@ def _config(directory: str, *, recovery: bool = True):
 
 
 class TestClassificationRecovery(unittest.TestCase):
+    def test_exported_masked_checkpoint_is_materialized_and_reloadable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = LeNet5()
+            PruningEngine("lenet5", "unstructured", "magnitude", "weight").execute(
+                model, {"amount": 0.1, "criterion_name": "magnitude"}
+            )
+            inputs = torch.randn(2, 1, 28, 28)
+            expected = model.eval()(inputs)
+            path = str(Path(directory) / "exported.pt")
+
+            ModelExporter.export_checkpoint(model, path)
+
+            payload = torch.load(path, weights_only=False)
+            self.assertFalse(MaskManager.has_mask(payload["model"].features[0]))
+            restored, _ = ModelLoader.load("lenet5", path, torch.device("cpu"))
+            torch.testing.assert_close(restored.eval()(inputs), expected)
+
     def test_recovery_keeps_masks_and_adapter_reloads_serialized_mask_state(self):
         with tempfile.TemporaryDirectory() as directory:
             model = LeNet5()

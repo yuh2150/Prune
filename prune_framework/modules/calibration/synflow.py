@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 
 from prune_framework.contracts.targets import PrunableTarget
+from prune_framework.modules.model.masks import MaskManager
 
 
 OutputReducer = Callable[[Any], torch.Tensor]
@@ -74,6 +75,12 @@ class SynFlowCalibrationRunner:
                 parameter.requires_grad_(True)
                 if parameter.is_floating_point() or parameter.is_complex():
                     parameter.data.abs_()
+            # Linearize floating state as in the reference's state_dict pass,
+            # while preserving integer counters and restoring buffers below.
+            with torch.no_grad():
+                for buffer in model.buffers():
+                    if buffer.is_floating_point():
+                        buffer.abs_()
             model.zero_grad(set_to_none=True)
 
             synthetic_input = input_factory()
@@ -85,7 +92,7 @@ class SynFlowCalibrationRunner:
 
             gradients: Dict[str, torch.Tensor] = {}
             for target in targets:
-                gradient = target.module.weight.grad
+                gradient = MaskManager.original_weight(target.module).grad
                 if gradient is None:
                     raise RuntimeError(f"SynFlow produced no gradient for target '{target.name}'.")
                 gradients[target.name] = gradient.detach().clone()

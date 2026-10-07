@@ -45,7 +45,8 @@ def test(data,
          criterion=0,
          img_dir='./coco/images/val2017',
          ann_file='./coco/annotations/instances_val2017.json',
-         modification=''
+         modification='',
+         precision_recall_conf_thres=0.25
          ):
     
     # Initialize/load model and set device
@@ -161,7 +162,8 @@ def test(data,
     postprocessor = RTDetrPostProcessor(hf_dir)
     w_name = Path(weights_dir).stem if weights_dir else "rtdetr"
     pred_json = str(save_dir / f"{w_name}_predictions.json") if save_dir else None
-    evaluator = COCOEvaluator(coco_gt, save_json_path=pred_json)
+    evaluator = COCOEvaluator(coco_gt, save_json_path=pred_json,
+                              precision_recall_conf_thres=precision_recall_conf_thres)
 
     eval_pipeline = EvaluationPipeline(preprocessor, postprocessor, evaluator)
 
@@ -177,8 +179,8 @@ def test(data,
 
     map = eval_result.map
     map50 = eval_result.map50
-    mp = map50
-    mr = eval_result.metrics.get("mar", 0.0)
+    mp = eval_result.metrics["precision"]
+    mr = eval_result.metrics["recall"]
     seen = eval_result.num_samples
 
     # Print results
@@ -211,6 +213,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=32, help='size of each image batch')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.001, help='object confidence threshold')
+    parser.add_argument('--precision-recall-conf-thres', type=float, default=0.25,
+                        help='confidence threshold for P/R at IoU 0.5 (mAP uses all retained scores)')
     parser.add_argument('--iou-thres', type=float, default=0.65, help='IOU threshold for post-processing')
     parser.add_argument('--task', default='val', help='val, pruning_sensitivity_analysis')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
@@ -265,6 +269,7 @@ if __name__ == '__main__':
              criterion=opt.criterion,
              img_dir=opt.img_dir,
              ann_file=opt.ann_file,
+             precision_recall_conf_thres=opt.precision_recall_conf_thres,
              modification=opt.modification
              )
              
@@ -333,6 +338,7 @@ if __name__ == '__main__':
                           plots=False,
                           img_dir=opt.img_dir,
                           ann_file=opt.ann_file,
+                          precision_recall_conf_thres=opt.precision_recall_conf_thres,
                           modification=''
                           )
             (mp_b, mr_b, map50_b, map_b, _, _, _), _, _, params_b, fs_b = r_base
@@ -368,6 +374,7 @@ if __name__ == '__main__':
                          plots=False,
                          img_dir=opt.img_dir,
                          ann_file=opt.ann_file,
+                         precision_recall_conf_thres=opt.precision_recall_conf_thres,
                          modification='prune-layer'
                          )
                 (mp, mr, map50, map_val, _, _, _), _, _, params, fs = r
@@ -423,6 +430,7 @@ if __name__ == '__main__':
                              plots=False,
                              img_dir=opt.img_dir,
                              ann_file=opt.ann_file,
+                             precision_recall_conf_thres=opt.precision_recall_conf_thres,
                              modification=opt.modification
                              )
                     (mp, mr, map50, map, _, _, _, ), maps, t, params, fs = r

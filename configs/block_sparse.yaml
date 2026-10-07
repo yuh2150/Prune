@@ -6,7 +6,7 @@ pruning:
   pruner: block_sparse
   criterion: magnitude
   granularity: weight
-  block_size: [4, 4]
+  block_shape: [4, 4]
   amount: 0.5
 benchmark:
   enabled: true # Dense fallback: latency is not sparse-kernel acceleration.

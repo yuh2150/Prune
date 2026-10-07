@@ -24,7 +24,7 @@ def _loss(model, batch):
 
 class TestLeNet5PruningSmoke(unittest.TestCase):
     def test_magnitude_snip_lamp_grasp_synflow_and_taylor_build_apply_forward(self):
-        cases = ("magnitude", "lamp", "snip", "grasp", "synflow")
+        cases = ("magnitude", "lamp", "snip", "grasp", "grasp_magnitude_guarded", "synflow")
         for criterion_name in cases:
             with self.subTest(criterion=criterion_name):
                 model = LeNet5()
@@ -34,7 +34,7 @@ class TestLeNet5PruningSmoke(unittest.TestCase):
                 targets = engine.targets(model)
                 if criterion_name == "snip":
                     config["gradient_calibration"] = GradientCalibrationRunner().run(model, targets, [_batch(), _batch()], _loss)
-                elif criterion_name == "grasp":
+                elif criterion_name.startswith("grasp"):
                     config["higher_order_calibration"] = HigherOrderCalibrationRunner().run(model, targets, [_batch()], _loss)
                 elif criterion_name == "synflow":
                     config["synflow_calibration"] = SynFlowCalibrationRunner().run(
@@ -78,11 +78,15 @@ class TestLeNet5PruningSmoke(unittest.TestCase):
                 LeNet5(), {"amount": 0.03, "block_shape": [4, 4], "criterion_name": "magnitude"}
             )
 
-    def test_nm_two_of_four_rejects_standard_lenet_nondivisible_conv_grouping(self):
-        with self.assertRaisesRegex(ValueError, "features.0 input width 25"):
-            PruningEngine("lenet5", "nm", "magnitude", "weight").build_plan(
-                LeNet5(), {"n": 2, "m": 4, "criterion_name": "magnitude"}
-            )
+    def test_nm_two_of_four_skips_incompatible_lenet_stem_and_prunes_compatible_layers(self):
+        plan = PruningEngine("lenet5", "nm", "magnitude", "weight").build_plan(
+            LeNet5(), {"n": 2, "m": 4, "criterion_name": "magnitude"}
+        )
+        self.assertIn(
+            {"name": "features.0", "input_width": 25, "m": 4},
+            plan.metadata["skipped_incompatible_targets"],
+        )
+        self.assertTrue(plan.groups)
 
     def test_classification_calibration_callback_uses_injected_loader(self):
         config = FrameworkConfig.from_dict({"model": {"name": "lenet5", "device": "cpu", "input_shape": [1, 1, 28, 28]}})

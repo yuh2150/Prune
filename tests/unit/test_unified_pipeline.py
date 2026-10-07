@@ -1,4 +1,5 @@
 import tempfile
+import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -26,6 +27,28 @@ class TinyDetector(nn.Module):
 
 
 class TestUnifiedPruningPipeline(unittest.TestCase):
+    def test_final_quality_is_saved_in_summary_and_latency_benchmark(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = FrameworkConfig.from_dict({
+                "model": {"name": "yolov5", "weights": "unused.pt", "device": "cpu"},
+                "pruning": {"method": "structured", "structure": "channel", "target_ratio": .25},
+                "evaluation": {"enabled": True},
+                "benchmark": {"enabled": True, "latency": True, "flops": False, "params": False, "warmup": 0, "runs": 1},
+                "experiment": {"name": "quality", "output_dir": directory},
+                "output_path": str(Path(directory) / "model.pt"),
+            })
+            quality = {"precision": .8, "recall": .7, "map50": .6, "map50_95": .4}
+            with patch("prune_framework.pipelines.unified.ModelLoader.load", return_value=(TinyDetector(), None)):
+                result = UnifiedPruningPipeline(config, evaluator=lambda model, stage: quality).run()
+            saved = json.loads(Path(result.artifacts["result"]).read_text())
+            for key, value in quality.items():
+                self.assertEqual(saved[key], value)
+                self.assertEqual(saved["baseline_metrics"][key], value)
+                self.assertEqual(saved["final_metrics"][key], value)
+                self.assertEqual(saved["pruning"]["benchmark"][key], value)
+                self.assertEqual(saved["stages"]["latency"][key], value)
+                self.assertEqual(saved[f"{key}_delta"], 0.)
+
     def test_rtdetr_taylor_reports_missing_integrated_calibration(self):
         config = FrameworkConfig.from_dict(
             {

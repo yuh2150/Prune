@@ -15,7 +15,7 @@ pruning:
   method: structured
   criterion: l1
   structure: filter
-  target_ratio: 0.30
+  target_ratio: 0.05
   global_pruning: false
   min_channels: 2
 
@@ -25,6 +25,7 @@ sensitivity:
 evaluation:
   enabled: true
   callback: experiments.classification:evaluate
+  metric: accuracy  # Also reports macro precision/recall/F1; detection mAP is N/A.
 
 recovery:
   enabled: false
@@ -41,5 +42,7 @@ export:
   enabled: false
 
 experiment:
-  name: resnet18_imagenet1000_filter
+  name: resnet18_imagenet1000_filter_05
   output_dir: artifacts
+
+output_path: artifacts/resnet18_imagenet1000_filter_05.pt

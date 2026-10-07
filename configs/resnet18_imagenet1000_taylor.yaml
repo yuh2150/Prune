@@ -15,11 +15,12 @@ pruning:
   method: structured
   criterion: taylor
   structure: filter
-  target_ratio: 0.30
+  target_ratio: 0.05
   global_pruning: false
   min_channels: 2
   calibration_callback: experiments.classification:calibrate
   calibration_batches: 4
+  calibration_batch_size: 64
 
 sensitivity:
   enabled: false
@@ -27,6 +28,7 @@ sensitivity:
 evaluation:
   enabled: true
   callback: experiments.classification:evaluate
+  metric: accuracy
 
 recovery:
   enabled: false
@@ -43,5 +45,7 @@ export:
   enabled: false
 
 experiment:
-  name: resnet18_imagenet1000_taylor
+  name: resnet18_imagenet1000_taylor_05
   output_dir: artifacts
+
+output_path: artifacts/resnet18_imagenet1000_taylor_05.pt

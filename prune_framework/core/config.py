@@ -56,6 +56,7 @@ class PruningConfig:
     calibration_batch_size: int = 1
     calibration_seed: int = 42
     calibration_accumulate: bool = True
+    parameter_scope: str = "weights"
     n: Optional[int] = None
     m: Optional[int] = None
     block_shape: Optional[List[int]] = None
@@ -160,7 +161,9 @@ class ExportConfig:
     onnx: bool = False
     format: str = "onnx"
     output_path: str = "pruned_model.onnx"
-    opset_version: int = 12
+    # Opset 17 is broadly supported by the installed Torch/ONNX toolchain;
+    # older defaults trigger unreliable version conversion in modern Torch.
+    opset_version: int = 17
 
     def wants_onnx(self) -> bool:
         return self.enabled and (self.onnx or self.format.lower() == "onnx")
@@ -195,8 +198,11 @@ class FrameworkConfig:
         self.targets.validate()
         if self.model.num_classes is not None and self.model.num_classes < 1:
             raise ConfigValidationException("model.num_classes must be positive when specified.")
-        if self.pruning.iterative_steps != 1:
-            raise ConfigValidationException("iterative_steps > 1 is not implemented; use one-shot planning.")
+        if self.pruning.iterative_steps != 1 and not (
+            self.pruning.criterion.lower() == "synflow"
+            and self.pruning.pruner.lower() in {"unstructured", "unstructured_weight"}
+        ):
+            raise ConfigValidationException("iterative_steps > 1 is supported only for unstructured SynFlow.")
         if not 0.0 <= self.pruning.amount < 1.0:
             raise ConfigValidationException("pruning.target_ratio/amount must be in [0, 1).")
         if self.pruning.iterative_steps < 1:

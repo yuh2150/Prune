@@ -1,0 +1,10 @@
+model: {name: lenet5_emnist_onnx, weights: LeNet5_Numbers&Characters_FP32.onnx, device: cpu, input_shape: [1, 1, 32, 32], num_classes: 47}
+dataset: {name: custom_47labels, root: ./datasets/Dataset_MNIST_47Labels_1000images, batch_size: 64, num_workers: 0, validation_fraction: 0.2, image_padding: 2}
+pruning: {method: structured, criterion: l1, structure: filter, target_ratio: 0.10, global_pruning: false, min_channels: 2}
+sensitivity: {enabled: true, rates: [0.05, 0.10], selector: sensitivity, max_allowed_relative_drop: 0.10}
+evaluation: {enabled: true, callback: experiments.classification:evaluate, metric: accuracy}
+recovery: {enabled: true, epochs: 1, callback: experiments.classification:recover, optimizer: {name: sgd, lr: 0.001}}
+benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+export: {enabled: true, onnx: true, output_path: artifacts/final/lenet_structured_filter.onnx, opset_version: 17}
+experiment: {name: final_lenet_structured_filter, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/final/lenet_structured_filter.pt

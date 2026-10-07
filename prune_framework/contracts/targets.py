@@ -162,8 +162,29 @@ class AttentionHeadTarget:
     head_dim: int = 0
     layout: str = "separate_qkv"
     metadata: Dict[str, Any] = field(default_factory=dict, compare=False)
+    # Only compact-attention pruning replaces a module, so its owner is
+    # optional for the regular adapter-driven mask implementation.
+    owner: Optional[nn.Module] = field(default=None, repr=False, compare=False)
+    attribute: Optional[str] = None
 
     def __post_init__(self) -> None:
+        # Older adapters constructed this target as
+        # ``(name, attention_module, owner, attribute[, metadata])``.  Accept
+        # that form and normalise it to explicit attention dimensions.
+        if isinstance(self.num_heads, nn.Module):
+            owner = self.num_heads
+            attribute = self.head_dim
+            legacy_metadata = self.layout if isinstance(self.layout, dict) else self.metadata
+            if not isinstance(attribute, str):
+                raise ValueError("Legacy attention targets require a string owner attribute.")
+            if not hasattr(self.module, "num_heads") or not hasattr(self.module, "head_dim"):
+                raise ValueError("Legacy attention target module must expose num_heads and head_dim.")
+            object.__setattr__(self, "owner", owner)
+            object.__setattr__(self, "attribute", attribute)
+            object.__setattr__(self, "num_heads", int(self.module.num_heads))
+            object.__setattr__(self, "head_dim", int(self.module.head_dim))
+            object.__setattr__(self, "layout", "fused_qkv" if hasattr(self.module, "in_proj_weight") else "separate_qkv")
+            object.__setattr__(self, "metadata", dict(legacy_metadata))
         if self.num_heads < 2 or self.head_dim < 1:
             raise ValueError("Attention head targets require at least two heads and a positive head dimension.")
         if self.layout not in {"separate_qkv", "fused_qkv"}:

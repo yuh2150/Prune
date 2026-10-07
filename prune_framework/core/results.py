@@ -11,6 +11,11 @@ class BenchmarkResult:
     latency_std_ms: float = 0.0
     latency_p50_ms: float = 0.0
     latency_p95_ms: float = 0.0
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    f1: Optional[float] = None
+    map50: Optional[float] = None
+    map50_95: Optional[float] = None
 
 
 @dataclass

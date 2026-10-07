@@ -2,6 +2,7 @@ import time
 import statistics
 import torch
 import torch.nn as nn
+from prune_framework.contracts.evaluation import normalize_evaluation
 from prune_framework.core.results import BenchmarkResult
 
 
@@ -63,6 +64,14 @@ class LatencyBenchmark:
             latency_p50_ms=round(_percentile(inf_times, 50), 3),
             latency_p95_ms=round(_percentile(inf_times, 95), 3),
         )
+
+
+def attach_quality_metrics(benchmark: BenchmarkResult, metrics) -> BenchmarkResult:
+    """Attach measured quality; unavailable metrics remain None, never zero."""
+    normalized = normalize_evaluation(metrics).metrics if metrics is not None else {}
+    for name in ("precision", "recall", "f1", "map50", "map50_95"):
+        setattr(benchmark, name, normalized.get(name))
+    return benchmark
 
 
 def _percentile(values, percentile: float) -> float:

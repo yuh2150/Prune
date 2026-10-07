@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import math
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Sequence
 
@@ -10,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from prune_framework.contracts.targets import PrunableTarget
+from prune_framework.modules.model.masks import MaskManager
 
 
 LossFunction = Callable[[nn.Module, Any], torch.Tensor]
@@ -46,16 +48,30 @@ class HigherOrderCalibrationResult(CalibrationResult):
     """Detached Hessian-gradient products collected for higher-order criteria.
 
     ``gradients`` contains ``H @ g`` for each requested target, where ``g`` is
-    the gradient of the mean calibration loss with respect to all model
-    parameters.  The first-order gradients are retained only as detached
+    the gradient of the mean calibration loss with respect to the selected
+    parameter scope (Conv2d/Linear weights by default).  The first-order gradients are retained only as detached
     diagnostic data; neither mapping holds an autograd graph.
     """
 
     first_order_gradients: Dict[str, torch.Tensor] = field(default_factory=dict)
+    parameter_scope: str = "weights"
+    parameter_names: List[str] = field(default_factory=list)
+    target_statistics: Dict[str, Any] = field(default_factory=dict)
+    batch_weights: List[float] = field(default_factory=list)
+
+    def context_for(self, target: PrunableTarget) -> Dict[str, torch.Tensor]:
+        return {"hvp": self.gradients[target.name], "first_order_grad": self.first_order_gradients[target.name]}
 
     def describe(self) -> Dict[str, Any]:
         description = super().describe()
         description["higher_order"] = True
+        description["algorithm"] = "two_pass_hvp"
+        description["hvp_objective"] = "grad(dot(g, stop_grad(g)))"
+        description["batch_weights"] = self.batch_weights
+        description["parameter_scope"] = self.parameter_scope
+        description["parameter_names"] = self.parameter_names
+        description["target_statistics"] = self.target_statistics
+        description["mean_loss"] = sum(loss * weight for loss, weight in zip(self.losses, self.batch_weights)) if self.losses else None
         description["first_order_targets"] = {
             name: list(gradient.shape) for name, gradient in self.first_order_gradients.items()
         }
@@ -178,7 +194,7 @@ class GradientCalibrationRunner:
         collected: Dict[str, torch.Tensor], targets: Sequence[PrunableTarget], *, absolute: bool = False
     ) -> None:
         for target in targets:
-            gradient = target.module.weight.grad
+            gradient = MaskManager.original_weight(target.module).grad
             if gradient is None:
                 raise RuntimeError(f"Calibration produced no gradient for target '{target.name}'.")
             value = gradient.detach().abs().clone() if absolute else gradient.detach().clone()
@@ -194,13 +210,15 @@ class HigherOrderCalibrationRunner:
     restores parameter gradients, ``requires_grad`` flags, buffers, modes and
     RNG state even if the loss function fails.
 
-    Memory scales with the number and size of retained calibration forward
-    graphs.  Callers should keep the supplied calibration batch count and
-    batch size intentionally small.
+    Two passes accumulate a detached mean gradient, then sum per-batch
+    Hessian-vector products. Only one batch's autograd graph is retained.
     """
 
-    def __init__(self, *, seed: int = 42):
+    def __init__(self, *, seed: int = 42, parameter_scope: str = "weights"):
         self.seed = int(seed)
+        if parameter_scope not in {"all", "weights"}:
+            raise ValueError("Higher-order parameter_scope must be 'all' or 'weights'.")
+        self.parameter_scope = parameter_scope
 
     def run(
         self,
@@ -208,12 +226,17 @@ class HigherOrderCalibrationRunner:
         targets: Sequence[PrunableTarget],
         batches: Iterable[Any],
         loss_fn: LossFunction,
+        batch_weights: Sequence[float] | None = None,
     ) -> HigherOrderCalibrationResult:
         batch_list = list(batches)
         if not batch_list:
             raise ValueError("Higher-order calibration requires at least one batch.")
         if not targets:
             raise ValueError("Higher-order calibration requires at least one target.")
+        weights = list(batch_weights) if batch_weights is not None else [1.0] * len(batch_list)
+        if len(weights) != len(batch_list) or any(not math.isfinite(w) or w <= 0 for w in weights):
+            raise ValueError("Higher-order batch_weights must be finite positive weights for every batch.")
+        normalized_weights = [weight / sum(weights) for weight in weights]
 
         prior_training = model.training
         prior_module_training = {id(module): module.training for module in model.modules()}
@@ -226,12 +249,18 @@ class HigherOrderCalibrationRunner:
         python_state = random.getstate()
         torch_state = torch.random.get_rng_state()
         cuda_states = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
-        result = HigherOrderCalibrationResult(batches=len(batch_list), accumulated=True)
+        result = HigherOrderCalibrationResult(batches=len(batch_list), accumulated=True, parameter_scope=self.parameter_scope)
 
-        # Retain every parameter in the vector used for H @ g.  This preserves
-        # cross-parameter Hessian terms from protected heads into safe targets.
-        parameters = list(model.parameters())
-        parameter_names = [name for name, _ in model.named_parameters()]
+        # The GraSP reference differentiates Conv2d/Linear weights, including
+        # protected classifier weights, but excludes biases and BN parameters.
+        weight_ids = {id(MaskManager.original_weight(module)) for module in model.modules()
+                      if isinstance(module, (nn.Conv2d, nn.Linear))}
+        named_parameters = [(name, parameter) for name, parameter in model.named_parameters()
+                            if self.parameter_scope == "all" or id(parameter) in weight_ids]
+        parameter_names = [name for name, _ in named_parameters]
+        parameters = [parameter for _, parameter in named_parameters]
+        result.parameter_names = parameter_names
+        result.batch_weights = normalized_weights
 
         try:
             random.seed(self.seed)
@@ -243,28 +272,46 @@ class HigherOrderCalibrationRunner:
                 parameter.requires_grad_(True)
             model.zero_grad(set_to_none=True)
 
-            mean_loss: torch.Tensor | None = None
-            scale = float(len(batch_list))
-            for batch in batch_list:
+            first_order = [torch.zeros_like(parameter) for parameter in parameters]
+            replay_states = []
+            for batch, batch_weight in zip(batch_list, normalized_weights):
+                replay_states.append((random.getstate(), torch.random.get_rng_state(),
+                                      torch.cuda.get_rng_state_all() if cuda_states is not None else None,
+                                      {name: buffer.detach().clone() for name, buffer in model.named_buffers()}))
                 loss = loss_fn(model, batch)
                 if not isinstance(loss, torch.Tensor) or loss.numel() != 1:
                     raise TypeError("Higher-order calibration loss_fn must return a scalar or single-element torch.Tensor.")
-                loss = loss.reshape(()) / scale
-                result.losses.append(float(loss.detach().cpu() * scale))
-                mean_loss = loss if mean_loss is None else mean_loss + loss
-
-            assert mean_loss is not None  # guarded by the non-empty batch check
-            raw_first_order = torch.autograd.grad(
-                mean_loss, parameters, create_graph=True, allow_unused=True
-            )
-            # ``parameter * 0`` gives unused parameters a differentiable zero,
-            # allowing a mixed model to produce an HVP without special cases.
-            first_order = tuple(
-                gradient if gradient is not None else parameter * 0.0
-                for parameter, gradient in zip(parameters, raw_first_order)
-            )
-            squared_gradient_norm = sum((gradient.square().sum() * 0.5) for gradient in first_order)
-            raw_hvp = torch.autograd.grad(squared_gradient_norm, parameters, allow_unused=True)
+                loss = loss.reshape(())
+                result.losses.append(float(loss.detach().cpu()))
+                loss = loss * batch_weight
+                gradients = torch.autograd.grad(loss, parameters, allow_unused=True)
+                for accumulated, gradient in zip(first_order, gradients):
+                    if gradient is not None:
+                        accumulated.add_(gradient.detach())
+            raw_hvp = [torch.zeros_like(parameter) for parameter in parameters]
+            for batch, batch_weight, (py_rng, cpu_rng, gpu_rng, buffers) in zip(batch_list, normalized_weights, replay_states):
+                # Replay the same stochastic forward and buffer state so both
+                # passes differentiate the same calibration objective.
+                random.setstate(py_rng)
+                torch.random.set_rng_state(cpu_rng)
+                if gpu_rng is not None:
+                    torch.cuda.set_rng_state_all(gpu_rng)
+                with torch.no_grad():
+                    for name, buffer in model.named_buffers():
+                        buffer.copy_(buffers[name])
+                loss = loss_fn(model, batch)
+                if not isinstance(loss, torch.Tensor) or loss.numel() != 1:
+                    raise TypeError("Higher-order calibration loss_fn must return a scalar or single-element torch.Tensor.")
+                gradients = torch.autograd.grad(loss.reshape(()) * batch_weight, parameters, create_graph=True, allow_unused=True)
+                # A differentiable zero also handles unused parameters and
+                # constant first derivatives (whose Hessian is exactly zero).
+                objective = sum(((gradient if gradient is not None else parameter * 0) * vector).sum()
+                                + (parameter * 0).sum()
+                                for parameter, gradient, vector in zip(parameters, gradients, first_order))
+                products = torch.autograd.grad(objective, parameters, allow_unused=True)
+                for accumulated, product in zip(raw_hvp, products):
+                    if product is not None:
+                        accumulated.add_(product.detach())
 
             parameter_to_hvp = {
                 name: (hvp if hvp is not None else torch.zeros_like(parameter)).detach().clone()
@@ -275,7 +322,7 @@ class HigherOrderCalibrationRunner:
                 for name, gradient in zip(parameter_names, first_order)
             }
             for target in targets:
-                target_weight = target.module.weight
+                target_weight = MaskManager.original_weight(target.module)
                 target_name = next(
                     (name for name, parameter in model.named_parameters() if parameter is target_weight), None
                 )
@@ -283,6 +330,16 @@ class HigherOrderCalibrationRunner:
                     raise RuntimeError(f"Calibration target '{target.name}' is not a model parameter.")
                 result.gradients[target.name] = parameter_to_hvp[target_name]
                 result.first_order_gradients[target.name] = parameter_to_first_order[target_name]
+                hvp = result.gradients[target.name]
+                score = -(target.module.weight.detach() * hvp)
+                result.target_statistics[target.name] = {
+                    "numel": score.numel(), "raw_score_min": float(score.min()),
+                    "raw_score_max": float(score.max()), "raw_score_mean": float(score.mean()),
+                    "raw_score_mean_abs": float(score.abs().mean()),
+                    "raw_score_std": float(score.std(unbiased=False)),
+                    "first_order_grad_norm": float(result.first_order_gradients[target.name].norm()),
+                    "hvp_norm": float(hvp.norm()),
+                }
             return result
         finally:
             # Drop model-visible gradients and all higher-order references before
