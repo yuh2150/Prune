@@ -9,6 +9,7 @@ Bắt đầu tại [Pruning Framework](pruning.md): flow, status, criteria, sens
 - [Concepts](concepts/pruning-and-sensitivity.md).
 - [Historical flow audit](architecture/pruning-flow-audit.md), [implementation contracts](architecture/pruning-contracts.md).
 - [Documentation audit](documentation-audit.md): phân loại tài liệu và sửa claim.
+- [Final pruning support report](final_pruning_support_report.md): trạng thái 14 kỹ thuật, E2E evidence, giới hạn resource và đề xuất hạ tầng.
 
 [REPORT](../REPORT.md), [PRUNING_GUIDE](PRUNING_GUIDE.md), [TECHNICAL_DOCUMENTATION](TECHNICAL_DOCUMENTATION.md) và [pruning_workflows](pruning_workflows.md) là historical/legacy references. Không dùng commands hoặc số liệu trong đó làm hướng dẫn/validation cho flow hiện tại.
 ## Classification

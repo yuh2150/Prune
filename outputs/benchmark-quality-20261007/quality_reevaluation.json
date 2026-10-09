@@ -5,7 +5,7 @@
     {
       "model": "lenet5",
       "reason": "FileNotFoundError: MNIST is not available in local cache './data/mnist'; download it explicitly before running.",
-      "source": "artifacts/artifacts/lenet5_block_sparse_smoke_20261005T103435654242Z/result.json",
+      "source": "artifacts/lenet5_block_sparse_smoke_20261005T103435654242Z/result.json",
       "status": "unavailable"
     },
     {
@@ -25,7 +25,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261004T175924678135Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_block_sparse_20261004T175924678135Z/result.json",
       "status": "updated"
     },
     {
@@ -45,7 +45,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105713722145Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_block_sparse_20261005T105713722145Z/result.json",
       "status": "updated"
     },
     {
@@ -65,7 +65,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105719478440Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_block_sparse_20261005T105719478440Z/result.json",
       "status": "updated"
     },
     {
@@ -85,7 +85,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105725428890Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_block_sparse_20261005T105725428890Z/result.json",
       "status": "updated"
     },
     {
@@ -105,7 +105,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_block_sparse_20261005T105731343978Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_block_sparse_20261005T105731343978Z/result.json",
       "status": "updated"
     },
     {
@@ -125,7 +125,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_filter_20261004T175901449090Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_filter_20261004T175901449090Z/result.json",
       "status": "updated"
     },
     {
@@ -145,7 +145,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_filter_20261005T105832810978Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_filter_20261005T105832810978Z/result.json",
       "status": "updated"
     },
     {
@@ -165,7 +165,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261004T175521588101Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_20261004T175521588101Z/result.json",
       "status": "updated"
     },
     {
@@ -185,7 +185,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105601807827Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_20261005T105601807827Z/result.json",
       "status": "updated"
     },
     {
@@ -205,7 +205,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105608022603Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_20261005T105608022603Z/result.json",
       "status": "updated"
     },
     {
@@ -225,7 +225,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105614227642Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_20261005T105614227642Z/result.json",
       "status": "updated"
     },
     {
@@ -245,7 +245,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_20261005T105620438617Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_20261005T105620438617Z/result.json",
       "status": "updated"
     },
     {
@@ -265,7 +265,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132435297346Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132435297346Z/result.json",
       "status": "updated"
     },
     {
@@ -285,7 +285,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132442661084Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132442661084Z/result.json",
       "status": "updated"
     },
     {
@@ -305,7 +305,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132449864694Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132449864694Z/result.json",
       "status": "updated"
     },
     {
@@ -325,7 +325,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132457161774Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_conv1_capped_smoke_20261005T132457161774Z/result.json",
       "status": "updated"
     },
     {
@@ -345,7 +345,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_diagnostic_10_20261005T114802308297Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_diagnostic_10_20261005T114802308297Z/result.json",
       "status": "updated"
     },
     {
@@ -365,7 +365,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132352606811Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132352606811Z/result.json",
       "status": "updated"
     },
     {
@@ -385,7 +385,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132359883482Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132359883482Z/result.json",
       "status": "updated"
     },
     {
@@ -405,7 +405,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132407169718Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132407169718Z/result.json",
       "status": "updated"
     },
     {
@@ -425,7 +425,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132414704082Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_grasp_layer_normalized_smoke_20261005T132414704082Z/result.json",
       "status": "updated"
     },
     {
@@ -445,7 +445,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261004T175529188603Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_lamp_20261004T175529188603Z/result.json",
       "status": "updated"
     },
     {
@@ -465,7 +465,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105649592221Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_lamp_20261005T105649592221Z/result.json",
       "status": "updated"
     },
     {
@@ -485,7 +485,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105655275836Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_lamp_20261005T105655275836Z/result.json",
       "status": "updated"
     },
     {
@@ -505,7 +505,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105700996686Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_lamp_20261005T105700996686Z/result.json",
       "status": "updated"
     },
     {
@@ -525,7 +525,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_lamp_20261005T105706835744Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_lamp_20261005T105706835744Z/result.json",
       "status": "updated"
     },
     {
@@ -545,7 +545,7 @@
       },
       "model": "lenet5",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_magnitude_20261004T173606779376Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_magnitude_20261004T173606779376Z/result.json",
       "status": "updated"
     },
     {
@@ -565,7 +565,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_magnitude_20261004T175510991100Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_magnitude_20261004T175510991100Z/result.json",
       "status": "updated"
     },
     {
@@ -585,7 +585,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_magnitude_20261005T104903515445Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_magnitude_20261005T104903515445Z/result.json",
       "status": "updated"
     },
     {
@@ -605,7 +605,7 @@
       },
       "model": "lenet5",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_sensitivity_prune_benchmark_20261004T122118813550Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_sensitivity_prune_benchmark_20261004T122118813550Z/result.json",
       "status": "updated"
     },
     {
@@ -625,7 +625,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_sensitivity_prune_benchmark_20261004T174711335706Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_sensitivity_prune_benchmark_20261004T174711335706Z/result.json",
       "status": "updated"
     },
     {
@@ -645,7 +645,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261004T175517809910Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_snip_20261004T175517809910Z/result.json",
       "status": "updated"
     },
     {
@@ -665,7 +665,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105537115972Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_snip_20261005T105537115972Z/result.json",
       "status": "updated"
     },
     {
@@ -685,7 +685,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105543092194Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_snip_20261005T105543092194Z/result.json",
       "status": "updated"
     },
     {
@@ -705,7 +705,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105549496193Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_snip_20261005T105549496193Z/result.json",
       "status": "updated"
     },
     {
@@ -725,7 +725,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_snip_20261005T105555518523Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_snip_20261005T105555518523Z/result.json",
       "status": "updated"
     },
     {
@@ -745,7 +745,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261004T175525444566Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_synflow_20261004T175525444566Z/result.json",
       "status": "updated"
     },
     {
@@ -765,7 +765,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105626496785Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_synflow_20261005T105626496785Z/result.json",
       "status": "updated"
     },
     {
@@ -785,7 +785,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105632215490Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_synflow_20261005T105632215490Z/result.json",
       "status": "updated"
     },
     {
@@ -805,7 +805,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105637994653Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_synflow_20261005T105637994653Z/result.json",
       "status": "updated"
     },
     {
@@ -825,7 +825,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_synflow_20261005T105643786354Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_synflow_20261005T105643786354Z/result.json",
       "status": "updated"
     },
     {
@@ -845,7 +845,7 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_taylor_20261004T175905273546Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_taylor_20261004T175905273546Z/result.json",
       "status": "updated"
     },
     {
@@ -865,43 +865,43 @@
       },
       "model": "lenet5_emnist_onnx",
       "num_samples": 200,
-      "source": "artifacts/artifacts/lenet5_custom_47labels_taylor_20261005T105918933329Z/result.json",
+      "source": "artifacts/lenet5_custom_47labels_taylor_20261005T105918933329Z/result.json",
       "status": "updated"
     },
     {
       "model": "resnet18",
       "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
-      "source": "artifacts/artifacts/resnet18_imagenet1000_channel_20261005T140621875598Z/result.json",
+      "source": "artifacts/resnet18_imagenet1000_channel_20261005T140621875598Z/result.json",
       "status": "unavailable"
     },
     {
       "model": "resnet18",
       "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
-      "source": "artifacts/artifacts/resnet18_imagenet1000_filter_20261005T140517089841Z/result.json",
+      "source": "artifacts/resnet18_imagenet1000_filter_20261005T140517089841Z/result.json",
       "status": "unavailable"
     },
     {
       "model": "resnet18",
       "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
-      "source": "artifacts/artifacts/resnet18_imagenet1000_nm_2of4_20261005T070328534534Z/result.json",
+      "source": "artifacts/resnet18_imagenet1000_nm_2of4_20261005T070328534534Z/result.json",
       "status": "unavailable"
     },
     {
       "model": "resnet18",
       "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
-      "source": "artifacts/artifacts/resnet18_imagenet1000_residual_block_20261005T073119777136Z/result.json",
+      "source": "artifacts/resnet18_imagenet1000_residual_block_20261005T073119777136Z/result.json",
       "status": "unavailable"
     },
     {
       "model": "resnet18",
       "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
-      "source": "artifacts/artifacts/resnet18_imagenet1000_taylor_20261005T140656976815Z/result.json",
+      "source": "artifacts/resnet18_imagenet1000_taylor_20261005T140656976815Z/result.json",
       "status": "unavailable"
     },
     {
       "model": "resnet18",
       "reason": "FileNotFoundError: ImageNet subset manifest not found: 'datasets/imagenet1k_val_1000/manifest.json'.",
-      "source": "artifacts/artifacts/resnet18_imagenet1000_taylor_sensitivity_20261005T144127316559Z/result.json",
+      "source": "artifacts/resnet18_imagenet1000_taylor_sensitivity_20261005T144127316559Z/result.json",
       "status": "unavailable"
     },
     {
@@ -935,7 +935,7 @@
       },
       "model": "yolov5",
       "num_samples": 500,
-      "source": "artifacts/artifacts/yolov5s_depth_sensitivity_20261004T190600657310Z/result.json",
+      "source": "artifacts/yolov5s_depth_sensitivity_20261004T190600657310Z/result.json",
       "status": "updated"
     },
     {
@@ -969,7 +969,7 @@
       },
       "model": "yolov5",
       "num_samples": 500,
-      "source": "artifacts/artifacts/yolov5s_filter_channel_global_10_20261004T194857725304Z/result.json",
+      "source": "artifacts/yolov5s_filter_channel_global_10_20261004T194857725304Z/result.json",
       "status": "updated"
     },
     {
@@ -1003,7 +1003,7 @@
       },
       "model": "yolov5",
       "num_samples": 500,
-      "source": "artifacts/artifacts/yolov5s_taylor_channel_global_10_20261004T201756236853Z/result.json",
+      "source": "artifacts/yolov5s_taylor_channel_global_10_20261004T201756236853Z/result.json",
       "status": "updated"
     },
     {

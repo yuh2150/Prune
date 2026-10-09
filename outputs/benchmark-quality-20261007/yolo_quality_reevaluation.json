@@ -30,7 +30,7 @@
         "total_ms": 175.6652708053589
       },
       "num_samples": 500,
-      "source": "artifacts/artifacts/yolov5s_depth_sensitivity_20261004T190600657310Z/result.json",
+      "source": "artifacts/yolov5s_depth_sensitivity_20261004T190600657310Z/result.json",
       "status": "updated"
     },
     {
@@ -63,7 +63,7 @@
         "total_ms": 185.18404150009155
       },
       "num_samples": 500,
-      "source": "artifacts/artifacts/yolov5s_filter_channel_global_10_20261004T194857725304Z/result.json",
+      "source": "artifacts/yolov5s_filter_channel_global_10_20261004T194857725304Z/result.json",
       "status": "updated"
     },
     {
@@ -96,7 +96,7 @@
         "total_ms": 184.80653762817383
       },
       "num_samples": 500,
-      "source": "artifacts/artifacts/yolov5s_taylor_channel_global_10_20261004T201756236853Z/result.json",
+      "source": "artifacts/yolov5s_taylor_channel_global_10_20261004T201756236853Z/result.json",
       "status": "updated"
     }
   ]

@@ -155,12 +155,12 @@ data/
 /datasets/imagenet1k_train_2000/
 /datasets/imagenet1k_val_1000/
 Dataset*/
-datasets/
 
 # Generated experiment artifacts and downloaded dataset archives stay local.
 
 /coco*.zip
 /~$*
+.~lock.*
 
 # Model weights and checkpoints
 weights/**/*.pt

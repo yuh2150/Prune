@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'artifacts' / 'artifacts'
+SOURCE = ROOT / 'artifacts'
 OUT = ROOT / 'artifacts' / 'pruning_benchmark_summary'
 OUT.mkdir(exist_ok=True)
 
@@ -85,7 +85,7 @@ for missing in ['L1 Regularization','L0 Regularization','Attention Head Pruning'
 
 intro = '''# Benchmark pruning từ artifacts
 
-Ngày tổng hợp: 06/10/2026. Nguồn chính: các `result.json` và cấu hình trong `artifacts/artifacts`. Đây là tổng hợp kết quả đã lưu, không phải benchmark mới chạy. Tất cả run có `result.json` đều được giữ, kể cả diagnostic hoặc thiếu dữ liệu; không chọn riêng lần chạy nhanh nhất. Các phương pháp thiếu kết quả được đánh dấu NR.
+Ngày tổng hợp: 06/10/2026. Nguồn chính: các `result.json` và cấu hình trong `artifacts/`. Đây là tổng hợp kết quả đã lưu, không phải benchmark mới chạy. Tất cả run có `result.json` đều được giữ, kể cả diagnostic hoặc thiếu dữ liệu; không chọn riêng lần chạy nhanh nhất. Các phương pháp thiếu kết quả được đánh dấu NR.
 
 **Nhóm so sánh:** A = LeNet5 chuyển từ ONNX, custom_47labels, input 1×1×32×32, CPU, baseline accuracy 84%; B = ResNet18, imagenet1k_subset, input 1×3×224×224, CUDA, baseline accuracy 70%; C = YOLOv5s, evaluation dùng `data/coco_500.yaml`, input 1×3×640×640 (kiểm tra từng config); D = model/baseline khác hoặc smoke. Không xếp hạng giữa các nhóm. CPU/GPU model, phiên bản runtime và điều kiện tải không được ghi đủ: **cùng hardware chưa được xác nhận**, kể cả trong nhóm. Config `dataset.name` của YOLO có thể là `mnist` mặc định; dataset detection lấy từ callback evaluation, không lấy tên mặc định này.
 
