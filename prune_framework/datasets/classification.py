@@ -35,6 +35,26 @@ def create_classification_dataloaders(config: Any, *, seed: int = 42) -> Classif
         validation = _limit(_ManifestImageNetDataset(config.root, transform), config.val_limit, seed)
         train = _limit(_ManifestImageNetDataset(getattr(config, "train_root", None) or config.root, transform), config.train_limit, seed)
         return ClassificationDataLoaders(train=DataLoader(train, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, generator=torch.Generator().manual_seed(seed)), validation=DataLoader(validation, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers))
+    if name == "cifar10":
+        # Match the selected CIFAR-10 ResNet-18 checkpoint preprocessing.
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.4914, 0.4822, 0.4465),
+                                 std=(0.2023, 0.1994, 0.2010)),
+        ])
+        try:
+            train = datasets.CIFAR10(root=config.root, train=True, transform=transform, download=False)
+            validation = datasets.CIFAR10(root=config.root, train=False, transform=transform, download=False)
+        except (RuntimeError, FileNotFoundError) as exc:
+            raise FileNotFoundError(
+                f"CIFAR10 is not available in local cache '{config.root}'; download it explicitly before running."
+            ) from exc
+        train, validation = _limit(train, config.train_limit, seed), _limit(validation, config.val_limit, seed + 1)
+        return ClassificationDataLoaders(
+            train=DataLoader(train, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers,
+                             generator=torch.Generator().manual_seed(seed)),
+            validation=DataLoader(validation, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers),
+        )
     transform_steps = [transforms.Pad(image_padding)] if image_padding else []
     transform_steps.append(transforms.ToTensor())
     transform = transforms.Compose(transform_steps)
@@ -47,7 +67,7 @@ def create_classification_dataloaders(config: Any, *, seed: int = 42) -> Classif
         "emnist": datasets.EMNIST,
     }
     if name not in classes:
-        raise ValueError("classification dataset.name must be 'mnist', 'fashionmnist', 'emnist', or 'custom_47labels'.")
+        raise ValueError("classification dataset.name must be 'cifar10', 'mnist', 'fashionmnist', 'emnist', or 'custom_47labels'.")
     factory = classes[name]
     dataset_kwargs = {}
     if name == "emnist":

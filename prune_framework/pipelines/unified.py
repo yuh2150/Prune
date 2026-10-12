@@ -94,6 +94,10 @@ class UnifiedPruningPipeline:
         else:
             stages.append(f"technique_specific_{_policy_kind(engine)}_policy")
         stages.extend(["requested_policy", "build_validate_plan", "BUILD_PLAN_ONLY_STOP", "apply_plan", "architecture_validation"])
+        if needs_eval:
+            stages.append("pre_finetune_evaluation_callback")
+        if cfg.benchmark.enabled and cfg.benchmark.latency:
+            stages.append("pre_finetune_pytorch_latency_benchmark")
         if cfg.recovery.enabled:
             stages.append("recovery_callback")
         if needs_eval:
@@ -101,7 +105,7 @@ class UnifiedPruningPipeline:
         if cfg.benchmark.params or cfg.benchmark.flops or cfg.targets.parameter_reduction is not None or cfg.targets.flops_reduction is not None:
             stages.append("final_complexity")
         if cfg.benchmark.enabled and cfg.benchmark.latency:
-            stages.append("pytorch_latency_benchmark")
+            stages.append("post_finetune_pytorch_latency_benchmark")
         stages.append("target_check")
         stages.append("save_checkpoint_reload_validate")
         if cfg.export.wants_onnx():
@@ -460,6 +464,26 @@ class UnifiedPruningPipeline:
         stages["apply_pruning"] = asdict(pruning_result)
         stages["architecture_validation"] = {"status": "passed"}
 
+        # Capture the immediately-pruned checkpoint before recovery so an
+        # experiment can distinguish pruning damage from fine-tuning recovery.
+        pre_recovery_metrics = self._evaluate(model, "post_pruning_pre_recovery") if self._needs_evaluation() else None
+        if pre_recovery_metrics is not None:
+            stages["pre_finetune_evaluation"] = pre_recovery_metrics
+        pre_recovery_benchmark = None
+        if cfg.benchmark.enabled and cfg.benchmark.latency:
+            pre_recovery_benchmark = LatencyBenchmark(cfg.benchmark.warmup, cfg.benchmark.runs).benchmark(
+                model, adapter.get_dummy_input(device)
+            )
+            attach_quality_metrics(pre_recovery_benchmark, pre_recovery_metrics)
+            stages["pre_finetune_latency"] = asdict(pre_recovery_benchmark)
+        artifact_paths["pre_finetune"] = artifacts.write_json(
+            "pre_finetune.json",
+            {
+                "metrics": pre_recovery_metrics,
+                "latency": asdict(pre_recovery_benchmark) if pre_recovery_benchmark is not None else None,
+            },
+        )
+
         if cfg.recovery.enabled:
             if self.recovery is None:
                 raise ConfigValidationException("recovery.enabled requires recovery.callback or a recovery callable.")
@@ -496,6 +520,8 @@ class UnifiedPruningPipeline:
             )
             attach_quality_metrics(benchmark, final_metrics)
             pruning_result.benchmark = benchmark
+            stages["post_finetune_latency"] = asdict(benchmark)
+            # Keep the legacy key for existing result readers.
             stages["latency"] = asdict(benchmark)
 
         target_metrics = dict(final_metrics or {})

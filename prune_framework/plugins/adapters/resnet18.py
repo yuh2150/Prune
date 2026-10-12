@@ -15,12 +15,28 @@ from prune_framework.core.registry import register_model
 
 @register_model("resnet18")
 @register_model("torchvision_resnet18")
+@register_model("resnet18_cifar10")
 class ResNet18Adapter(BaseModelAdapter):
     @classmethod
     def load_model(cls, weights_path: str, device: torch.device, *, num_classes: Optional[int] = None) -> Tuple[nn.Module, Optional[Any]]:
         from torchvision.models import ResNet18_Weights, resnet18
+        if num_classes == 10 and str(weights_path).startswith("hf_hub:"):
+            try:
+                from huggingface_hub import hf_hub_download
+            except ImportError as exc:
+                raise RuntimeError("CIFAR-10 ResNet-18 requires huggingface_hub. Install it with 'pip install huggingface_hub'.") from exc
+            repo_id = str(weights_path).removeprefix("hf_hub:")
+            checkpoint_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+            state_dict = torch.load(checkpoint_path, map_location=device, weights_only=True)
+            # CIFAR ResNet-18 has a 3x3/stride-1 stem and no max-pool, unlike
+            # torchvision's ImageNet ResNet-18 (7x7/stride-2 stem + max-pool).
+            model = resnet18(weights=None, num_classes=10)
+            model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+            model.maxpool = nn.Identity()
+            model.load_state_dict(state_dict, strict=True)
+            return model.to(device), {"state_dict": state_dict, "source": repo_id}
         if num_classes not in (None, 1000):
-            raise ValueError("ImageNet-pretrained ResNet-18 requires num_classes=1000.")
+            raise ValueError("ResNet-18 supports num_classes=10 only with an hf_hub: CIFAR-10 checkpoint.")
         if weights_path and os.path.isfile(weights_path):
             try:
                 payload = torch.load(weights_path, map_location=device, weights_only=True)
@@ -96,4 +112,5 @@ class ResNet18Adapter(BaseModelAdapter):
 
     def get_dummy_input(self, device: torch.device) -> torch.Tensor:
         parameter = next(self.model.parameters())
-        return torch.randn(1, 3, 224, 224, device=device, dtype=parameter.dtype)
+        spatial_size = 32 if getattr(self.model.conv1, "kernel_size", None) == (3, 3) else 224
+        return torch.randn(1, 3, spatial_size, spatial_size, device=device, dtype=parameter.dtype)
