@@ -2,9 +2,9 @@
 # intentionally uses a C3TR checkpoint that exposes adapter-approved MHA targets.
 model: {name: yolov5, weights: weights/yolov5s-c3tr.pt, device: cuda, input_shape: [1, 3, 640, 640]}
 pruning: {method: attention_head, criterion: magnitude, structure: head, target_ratio: 0.25}
-sensitivity: {enabled: true, rates: [0.10, 0.25], max_allowed_relative_drop: 0.05, metric_direction: higher_is_better}
+sensitivity: {enabled: true, rates: [0.05, 0.10, 0.20], max_allowed_relative_drop: 0.05, metric_direction: higher_is_better}
 evaluation: {enabled: true, callback: experiments.yolov5:evaluate, metric: map50_95, kwargs: {data: data/coco500.yaml, batch_size: 8, imgsz: 640}}
-recovery: {enabled: true, epochs: 1, callback: experiments.yolov5:recover, kwargs: {data: data/coco500.yaml, batch_size: 8, imgsz: 640, workers: 0, lr: 0.0001, momentum: 0.9, weight_decay: 0.0001}}
+recovery: {enabled: true, epochs: 5, callback: experiments.yolov5:recover, kwargs: {data: data/coco500.yaml, batch_size: 8, imgsz: 640, workers: 0, lr: 0.0001, momentum: 0.9, weight_decay: 0.0001}}
 benchmark: {enabled: true, latency: true, flops: true, params: true, warmup: 10, runs: 50}
 export: {enabled: true, onnx: true, output_path: artifacts/final/yolov5_c3tr_attention_head.onnx, opset_version: 17}
 experiment: {name: final_yolov5_c3tr_attention_head, output_dir: artifacts, seed: 42, deterministic: true}

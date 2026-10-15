@@ -1,11 +1,11 @@
-# Báo cáo hỗ trợ 14 kỹ thuật pruning
+# Báo cáo hỗ trợ 14 nhóm kỹ thuật pruning (15 recipe)
 
 **Ngày:** 08/10/2026  
 **Phạm vi:** framework pruning hiện tại, không dùng các benchmark legacy làm bằng chứng cho pipeline mới.
 
 ## 1. Kết luận tóm tắt
 
-Framework đã có implementation cho **14 kỹ thuật pruning** và một pipeline thống nhất từ model/dataset đến artifact đã prune:
+Framework đã có implementation cho **14 nhóm kỹ thuật pruning** qua **15 recipe canonical** (L1 và L0 tách riêng) và một pipeline thống nhất từ model/dataset đến artifact đã prune:
 
 ```text
 model + dataset
@@ -26,6 +26,7 @@ model + dataset
 
 | Nhóm | Kỹ thuật | Granularity / cơ chế | Trạng thái hiện tại |
 |---|---|---|---|
+| Unstructured | Magnitude | Weight magnitude, global mask | Pipeline integrated + test |
 | Unstructured | SNIP | Weight, first-order saliency | E2E validated trên LeNet local |
 | Unstructured | GraSP | Weight, higher-order saliency | E2E validated trên LeNet local |
 | Unstructured | SynFlow | Weight, data-free flow score | E2E validated trên LeNet local |
@@ -45,14 +46,14 @@ model + dataset
 
 ## 3. Bằng chứng full pipeline đã chạy
 
-Mười bốn config canonical trong `configs/final/` đều khai báo flow hoàn chỉnh:
+Mười lăm config canonical trong `configs/final/` đều khai báo flow hoàn chỉnh, bao phủ 14 nhóm kỹ thuật; L1 và L0 dùng recipe riêng vì cơ chế regularization và selection khác nhau. Phân bổ hiện tại gồm 5 recipe unstructured trên LeNet, 9 recipe trên ResNet-18 CIFAR-10 và 1 recipe attention-head trên YOLOv5 C3TR. Mọi recipe dùng ba mức sensitivity `5%`, `10%`, `20%`. SNIP, GraSP và SynFlow không chạy recovery; các recipe còn lại recovery `5` epoch:
 
 ```text
-sensitivity analysis → selection → apply pruning → fine-tune
+sensitivity analysis → selection → apply pruning → optional fine-tune/recovery
 → evaluation → benchmark → checkpoint/ONNX validation
 ```
 
-Chín config LeNet dưới đây đã chạy với model ONNX LeNet 47 classes, dataset local `custom_47labels`, recovery một epoch và ONNX export bật. Bốn config ResNet-18 CIFAR-10 (L1, L0, layer, block) và config YOLOv5 C3TR attention-head là recipe full-flow, nhưng chỉ được ghi nhận E2E sau khi chạy với checkpoint/dataset local tương ứng:
+Các kết quả benchmark lịch sử dưới đây đến từ chín lần chạy LeNet với recovery một epoch. Bộ recipe canonical hiện tại đã tắt recovery cho SNIP, GraSP, SynFlow; đồng thời chuyển Channel, Filter, Taylor, N:M và Block Sparse sang ResNet-18 CIFAR-10 với recovery năm epoch. Vì vậy cần chạy lại trước khi dùng bảng cũ để so sánh kết quả mới. Các recipe ResNet-18 CIFAR-10 và YOLOv5 C3TR chỉ được ghi nhận E2E sau khi chạy với checkpoint/dataset local tương ứng:
 
 Manifest benchmark và link đến từng raw `result.json`: [`artifacts/final/benchmark_final.md`](../artifacts/final/benchmark_final.md).
 
@@ -70,7 +71,7 @@ Manifest benchmark và link đến từng raw `result.json`: [`artifacts/final/b
 
 Unstructured và semi-structured chỉ tạo mask, nên tensor shape và parameter count không giảm; không được dùng số này để claim speedup dense-runtime. Channel/filter/Taylor thay đổi topology thật, nên có physical parameter reduction.
 
-## 4. Rút ra từ 14 kỹ thuật
+## 4. Rút ra từ 14 nhóm kỹ thuật
 
 1. **Không có một policy chung đúng cho mọi technique.** Sensitivity theo layer phù hợp với channel/filter/Taylor; global saliency phù hợp SNIP/GraSP/SynFlow/LAMP; N:M/block sparse cần validate pattern trước khi apply.
 2. **Structured pruning khó hơn nhưng deploy rõ ràng hơn.** Dependency graph phải sửa các consumer liên quan, nhưng đổi lại model nhỏ hơn thật và có tiềm năng giảm latency ngay với dense runtime.

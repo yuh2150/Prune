@@ -3,9 +3,9 @@ dataset: {name: custom_47labels, root: ./datasets/Dataset_MNIST_47Labels_1000ima
 # Canonical pretrained GraSP policy: magnitude shortlist followed by
 # layer-normalized signed GraSP scoring. Public benchmark label remains GraSP.
 pruning: {method: unstructured, criterion: grasp_magnitude_guarded, parameter_scope: weights, structure: weight, target_ratio: 0.05, global_pruning: true, calibration_callback: experiments.classification:calibrate, calibration_batches: 4, calibration_batch_size: 64, calibration_kwargs: {temperature: 200, microbatch_size: 20}}
-sensitivity: {enabled: true, rates: [0.02, 0.05], max_allowed_relative_drop: 0.10, metric_direction: higher_is_better}
+sensitivity: {enabled: true, rates: [0.05, 0.10, 0.20], max_allowed_relative_drop: 0.10, metric_direction: higher_is_better}
 evaluation: {enabled: true, callback: experiments.classification:evaluate, metric: accuracy}
-recovery: {enabled: true, epochs: 1, callback: experiments.classification:recover, optimizer: {name: sgd, lr: 0.001}}
+recovery: {enabled: false}
 benchmark: {enabled: true, latency: true, flops: true, params: true, warmup: 20, runs: 100}
 export: {enabled: true, onnx: true, output_path: artifacts/final/lenet_unstructured_grasp.onnx, opset_version: 17}
 experiment: {name: final_lenet_unstructured_grasp, output_dir: artifacts, seed: 42, deterministic: true}
