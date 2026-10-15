@@ -4,7 +4,7 @@ pruning: {method: structured, criterion: l1, structure: filter, target_ratio: 0.
 sensitivity: {enabled: true, rates: [0.05, 0.10], selector: sensitivity, max_allowed_relative_drop: 0.10}
 evaluation: {enabled: true, callback: experiments.classification:evaluate, metric: accuracy}
 recovery: {enabled: true, epochs: 1, callback: experiments.classification:recover, optimizer: {name: sgd, lr: 0.001}}
-benchmark: {enabled: false, latency: false, flops: false, params: false, warmup: 0, runs: 1}
+benchmark: {enabled: true, latency: true, flops: true, params: true, warmup: 20, runs: 100}
 export: {enabled: true, onnx: true, output_path: artifacts/final/lenet_structured_filter.onnx, opset_version: 17}
 experiment: {name: final_lenet_structured_filter, output_dir: artifacts, seed: 42, deterministic: true}
 output_path: artifacts/final/lenet_structured_filter.pt

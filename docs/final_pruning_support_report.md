@@ -45,7 +45,14 @@ model + dataset
 
 ## 3. Bằng chứng full pipeline đã chạy
 
-Chín config canonical ở `configs/final/` đã chạy với model ONNX LeNet 47 classes, dataset local `custom_47labels`, recovery một epoch và ONNX export bật:
+Mười bốn config canonical trong `configs/final/` đều khai báo flow hoàn chỉnh:
+
+```text
+sensitivity analysis → selection → apply pruning → fine-tune
+→ evaluation → benchmark → checkpoint/ONNX validation
+```
+
+Chín config LeNet dưới đây đã chạy với model ONNX LeNet 47 classes, dataset local `custom_47labels`, recovery một epoch và ONNX export bật. Bốn config ResNet-18 CIFAR-10 (L1, L0, layer, block) và config YOLOv5 C3TR attention-head là recipe full-flow, nhưng chỉ được ghi nhận E2E sau khi chạy với checkpoint/dataset local tương ứng:
 
 Manifest benchmark và link đến từng raw `result.json`: [`artifacts/final/benchmark_final.md`](../artifacts/final/benchmark_final.md).
 

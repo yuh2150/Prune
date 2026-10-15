@@ -137,6 +137,35 @@ class TestUnifiedPruningPipeline(unittest.TestCase):
             self.assertTrue(Path(result.artifacts["result"]).is_file())
             self.assertTrue(Path(result.artifacts["checkpoint"]).is_file())
 
+    def test_global_policy_sensitivity_selects_a_budget_before_final_plan(self):
+        """Global mechanisms probe whole plans, not invalid per-layer policies."""
+        with tempfile.TemporaryDirectory() as directory:
+            config = FrameworkConfig.from_dict({
+                "model": {"name": "yolov5", "weights": "unused.pt", "device": "cpu"},
+                "pruning": {
+                    "method": "unstructured", "criterion": "magnitude", "structure": "weight",
+                    "target_ratio": 0.50, "global_pruning": True,
+                },
+                "sensitivity": {
+                    "enabled": True, "rates": [0.25, 0.50],
+                    "max_allowed_relative_drop": 0.05,
+                },
+                "evaluation": {"enabled": True, "metric": "map"},
+                "benchmark": {"enabled": False, "latency": False, "flops": False, "params": False, "runs": 1},
+                "export": {"enabled": False},
+                "experiment": {"name": "global-policy", "output_dir": directory},
+                "output_path": str(Path(directory) / "must-not-exist.pt"),
+            })
+            with patch("prune_framework.pipelines.unified.ModelLoader.load", return_value=(TinyDetector(), None)):
+                result = UnifiedPruningPipeline(
+                    config, evaluator=lambda model, stage: {"map": 0.8}
+                ).run(build_plan_only=True)
+
+            self.assertEqual(result.policy["strategy"], "policy_sensitivity")
+            self.assertEqual(result.policy["selected_amount"], 0.50)
+            self.assertTrue(Path(result.artifacts["sensitivity"]).is_file())
+            self.assertTrue(Path(result.artifacts["selection"]).is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,11 @@
+# Full flow: remove one adapter-approved ResNet layer (the final BasicBlock of a stage).
+model: {name: resnet18, weights: "hf_hub:edadaltocg/resnet18_cifar10", device: cuda, input_shape: [1, 3, 32, 32], num_classes: 10}
+dataset: {name: cifar10, root: datasets/cifar10, batch_size: 64, num_workers: 2}
+pruning: {method: layer, criterion: magnitude, structure: layer, target_ratio: 0.25}
+sensitivity: {enabled: true, rates: [0.10, 0.25], max_allowed_relative_drop: 0.05, metric_direction: higher_is_better}
+evaluation: {enabled: true, callback: experiments.classification:evaluate, metric: accuracy}
+recovery: {enabled: true, epochs: 1, callback: experiments.classification:recover, optimizer: {name: sgd, lr: 0.0001, momentum: 0.9, weight_decay: 0.0001}}
+benchmark: {enabled: true, latency: true, flops: true, params: true, warmup: 20, runs: 100}
+export: {enabled: true, onnx: true, output_path: artifacts/final/resnet18_cifar10_layer_pruning.onnx, opset_version: 17}
+experiment: {name: final_resnet18_cifar10_layer_pruning, output_dir: artifacts, seed: 42, deterministic: true}
+output_path: artifacts/final/resnet18_cifar10_layer_pruning.pt

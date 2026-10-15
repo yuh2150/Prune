@@ -73,8 +73,6 @@ class UnifiedPruningPipeline:
         }
         if (cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine)) or cfg.pruning.layer_params is not None:
             compatibility['pruning_params'] = cfg.pruning.layer_params or [(0, cfg.pruning.amount)]
-        if cfg.sensitivity.enabled and cfg.regularization.enabled and cfg.regularization.term == 'l0_hard_concrete':
-            raise ConfigValidationException('L0 forced indices cannot override sensitivity layer-wise policy')
         engine.validate_compatibility(compatibility)
         stages = ["seed_and_create_artifacts", "load_model_and_select_plugins", "baseline_snapshot"]
         if cfg.benchmark.params or cfg.benchmark.flops or cfg.targets.parameter_reduction is not None or cfg.targets.flops_reduction is not None:
@@ -89,8 +87,15 @@ class UnifiedPruningPipeline:
             stages.append("dependency_preflight")
         if calibration:
             stages.append("importance_calibration")
-        if cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine):
-            stages.extend(["sensitivity_probes", "select_layer_ratios"])
+        if cfg.sensitivity.enabled:
+            l0_policy_sensitivity = (
+                cfg.regularization.enabled and cfg.regularization.term == "l0_hard_concrete"
+            )
+            stages.extend([
+                "sensitivity_probes",
+                "select_layer_ratios" if _uses_layerwise_sensitivity(engine) and not l0_policy_sensitivity
+                else "select_technique_policy",
+            ])
         else:
             stages.append(f"technique_specific_{_policy_kind(engine)}_policy")
         stages.extend(["requested_policy", "build_validate_plan", "BUILD_PLAN_ONLY_STOP", "apply_plan", "architecture_validation"])
@@ -176,8 +181,6 @@ class UnifiedPruningPipeline:
         }
         if (cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine)) or cfg.pruning.layer_params is not None:
             compatibility_config['pruning_params'] = cfg.pruning.layer_params or [(0, cfg.pruning.amount)]
-        if cfg.sensitivity.enabled and cfg.regularization.enabled and cfg.regularization.term == 'l0_hard_concrete':
-            raise ConfigValidationException('L0 forced indices cannot override sensitivity layer-wise policy')
         engine.validate_compatibility(compatibility_config)
         if build_plan_only and cfg.regularization.enabled:
             raise ConfigValidationException('build-plan-only cannot run pre-pruning regularization training; provide a prepared checkpoint')
@@ -357,7 +360,12 @@ class UnifiedPruningPipeline:
         selection_summary = None
         sensitivity_summary = None
         pruning_params = cfg.pruning.layer_params if cfg.pruning.layer_params is not None else cfg.pruning.amount
-        if cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine):
+        effective_amount = cfg.pruning.amount
+        forced_indices: Dict[str, list[int]] = {}
+        l0_policy_sensitivity = (
+            cfg.regularization.enabled and cfg.regularization.term == "l0_hard_concrete"
+        )
+        if cfg.sensitivity.enabled and _uses_layerwise_sensitivity(engine) and not l0_policy_sensitivity:
             self._require_evaluator("sensitivity analysis")
             analyzer = SensitivityAnalyzer(
                 model_name=cfg.model.name,
@@ -388,6 +396,27 @@ class UnifiedPruningPipeline:
             artifact_paths["sensitivity"] = artifacts.write_json("sensitivity.json", sensitivity_summary)
             artifact_paths["selection"] = artifacts.write_json("selection.json", selection_summary)
             stages["sensitivity"] = {"profiles": len(result.profiles), "selector": cfg.sensitivity.selector}
+        elif cfg.sensitivity.enabled:
+            # Global masks, constrained patterns, structural blocks, attention
+            # heads and Hard-Concrete gates have no valid layer-ratio policy.
+            # Probe the complete technique at each candidate budget instead;
+            # the selected budget is then used for the final plan.
+            sensitivity_summary, selection_summary, selected_amount, forced_indices = self._analyze_policy_sensitivity(
+                engine=engine,
+                model=model,
+                active_criterion=active_criterion,
+                calibration=calibration_payload,
+                l0_policy=l0_policy_sensitivity,
+            )
+            pruning_params = selected_amount
+            effective_amount = selected_amount
+            artifact_paths["sensitivity"] = artifacts.write_json("sensitivity.json", sensitivity_summary)
+            artifact_paths["selection"] = artifacts.write_json("selection.json", selection_summary)
+            stages["sensitivity"] = {
+                "profiles": len(sensitivity_summary["candidates"]),
+                "selector": "policy_sensitivity",
+                "policy_kind": sensitivity_summary["policy_kind"],
+            }
         else:
             # Each non-layerwise mechanism owns a valid policy domain: global
             # saliency for unstructured, adapter structural scores for depth,
@@ -407,7 +436,7 @@ class UnifiedPruningPipeline:
         requested_pruning_plan = {
             "method": cfg.pruning.pruner,
             "granularity": cfg.pruning.granularity,
-            "target_ratio": cfg.pruning.amount,
+            "target_ratio": effective_amount,
             "global": cfg.pruning.global_pruning,
             "targets": pruning_params,
         }
@@ -415,7 +444,7 @@ class UnifiedPruningPipeline:
 
         pruning_config = {
             "allow_noop": cfg.pruning.allow_noop,
-            "amount": cfg.pruning.amount,
+            "amount": effective_amount,
             "pruning_params": pruning_params,
             "global_pruning": cfg.pruning.global_pruning,
             "iterative_steps": cfg.pruning.iterative_steps,
@@ -425,9 +454,8 @@ class UnifiedPruningPipeline:
             "block_shape": cfg.pruning.block_shape,
         }
         if cfg.regularization.enabled and cfg.regularization.term == "l0_hard_concrete":
-            gate_indices = regularization.prune_indices(
-                threshold=cfg.regularization.gate_threshold,
-                min_channels=cfg.pruning.min_channels,
+            gate_indices = forced_indices if cfg.sensitivity.enabled else regularization.prune_indices(
+                threshold=cfg.regularization.gate_threshold, min_channels=cfg.pruning.min_channels
             )
             pruning_config["forced_channel_indices"] = gate_indices
             pruning_config["l0_gate_controller"] = regularization
@@ -600,6 +628,107 @@ class UnifiedPruningPipeline:
         return (self.config.evaluation.enabled or self.config.sensitivity.enabled
                 or self.config.targets.max_map50_drop is not None or self.config.targets.max_map50_95_drop is not None)
 
+    def _analyze_policy_sensitivity(
+        self,
+        *,
+        engine: PruningEngine,
+        model: nn.Module,
+        active_criterion: str,
+        calibration: Dict[str, Any],
+        l0_policy: bool,
+    ) -> tuple[Dict[str, Any], Dict[str, Any], float, Dict[str, list[int]]]:
+        """Probe complete non-layerwise plans and select a safe scalar budget.
+
+        Layer-wise sensitivity is only valid for physically structured channel
+        or filter pruning.  Other mechanisms select weights, patterns, blocks,
+        heads or learned gates globally.  Their sensitivity unit is therefore
+        a complete candidate plan at a candidate budget, not an invented
+        per-layer rate.  The selected rate is reused for the final plan.
+        """
+        cfg = self.config
+        self._require_evaluator("policy sensitivity analysis")
+        snapshot = ModelSnapshot(model)
+        baseline_score = self._metric(self._evaluate(snapshot.restore(), "sensitivity"))
+        candidates = []
+        selected_forced_indices: Dict[float, Dict[str, list[int]]] = {}
+
+        for rate in sorted(set(float(item) for item in cfg.sensitivity.rates)):
+            candidate = snapshot.restore()
+            probe_config = {
+                "allow_noop": True,
+                "amount": rate,
+                "pruning_params": rate,
+                "global_pruning": cfg.pruning.global_pruning,
+                "iterative_steps": cfg.pruning.iterative_steps,
+                "min_channels": cfg.pruning.min_channels,
+                "n": cfg.pruning.n,
+                "m": cfg.pruning.m,
+                "block_shape": cfg.pruning.block_shape,
+            }
+            probe_config.update(calibration)
+            try:
+                # Build the plan while L0 gates are still available to its
+                # criterion, then remove cloned train-time hooks before the
+                # physical probe is executed.
+                plan = engine.build_plan(candidate, probe_config)
+                if l0_policy:
+                    selected_forced_indices[rate] = {
+                        group.primary.name: [int(index) for index in group.indices]
+                        for group in plan.groups
+                    }
+                    _remove_hard_concrete_state(candidate)
+                engine.execute(candidate, probe_config, verify_forward=True, plan=plan)
+                score = self._metric(self._evaluate(candidate, "sensitivity"))
+                drop = baseline_score - score if cfg.sensitivity.metric_direction == "higher_is_better" else score - baseline_score
+                relative_drop = drop / abs(baseline_score) if baseline_score else (float("inf") if drop > 0 else 0.0)
+                candidates.append({
+                    "rate": rate,
+                    "score": score,
+                    "metric_drop": drop,
+                    "relative_drop": relative_drop,
+                    "is_valid": True,
+                    "plan_groups": len(plan.groups),
+                })
+            except Exception as exc:
+                candidates.append({
+                    "rate": rate,
+                    "score": None,
+                    "metric_drop": None,
+                    "relative_drop": None,
+                    "is_valid": False,
+                    "error_message": str(exc),
+                })
+
+        allowed = [
+            item for item in candidates
+            if item["is_valid"]
+            and item["rate"] <= cfg.pruning.amount
+            and item["relative_drop"] <= cfg.sensitivity.max_allowed_relative_drop
+        ]
+        if not allowed:
+            raise PruningExecutionError(
+                "Policy sensitivity produced no valid candidate within the requested budget and quality limit."
+            )
+        winner = max(allowed, key=lambda item: item["rate"])
+        selected_rate = float(winner["rate"])
+        policy_kind = _policy_kind(engine)
+        sensitivity_summary = {
+            "baseline_score": baseline_score,
+            "policy_kind": policy_kind,
+            "criterion": active_criterion,
+            "metric_direction": cfg.sensitivity.metric_direction,
+            "candidates": candidates,
+        }
+        selection_summary = {
+            "strategy": "policy_sensitivity",
+            "policy_kind": policy_kind,
+            "requested_amount": cfg.pruning.amount,
+            "selected_amount": selected_rate,
+            "max_allowed_relative_drop": cfg.sensitivity.max_allowed_relative_drop,
+            "selected_candidate": winner,
+        }
+        return sensitivity_summary, selection_summary, selected_rate, selected_forced_indices.get(selected_rate, {})
+
     def _require_evaluator(self, stage: str) -> None:
         if self.evaluator is None:
             raise ConfigValidationException(
@@ -729,6 +858,20 @@ def _policy_kind(engine: PruningEngine) -> str:
 def _uses_layerwise_sensitivity(engine: PruningEngine) -> bool:
     """Only mechanisms with a meaningful layer-ratio policy run generic probes."""
     return engine.pruner_cls.pruning_mode == "structured"
+
+
+def _remove_hard_concrete_state(model: nn.Module) -> None:
+    """Detach cloned Hard-Concrete hooks after their scores formed a probe plan."""
+    from prune_framework.modules.regularization import HardConcreteChannelGate
+
+    for module in model.modules():
+        if not hasattr(module, "_prune_hard_concrete_gate"):
+            continue
+        for key, hook in list(module._forward_hooks.items()):
+            defaults = getattr(hook, "__defaults__", None) or ()
+            if any(isinstance(default, HardConcreteChannelGate) for default in defaults):
+                del module._forward_hooks[key]
+        delattr(module, "_prune_hard_concrete_gate")
 
 
 def _sensitivity_to_dict(result) -> Dict[str, Any]:

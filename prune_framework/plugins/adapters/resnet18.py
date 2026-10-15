@@ -19,24 +19,13 @@ from prune_framework.core.registry import register_model
 class ResNet18Adapter(BaseModelAdapter):
     @classmethod
     def load_model(cls, weights_path: str, device: torch.device, *, num_classes: Optional[int] = None) -> Tuple[nn.Module, Optional[Any]]:
-        from torchvision.models import ResNet18_Weights, resnet18
-        if num_classes == 10 and str(weights_path).startswith("hf_hub:"):
-            try:
-                from huggingface_hub import hf_hub_download
-            except ImportError as exc:
-                raise RuntimeError("CIFAR-10 ResNet-18 requires huggingface_hub. Install it with 'pip install huggingface_hub'.") from exc
-            repo_id = str(weights_path).removeprefix("hf_hub:")
-            checkpoint_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
-            state_dict = torch.load(checkpoint_path, map_location=device, weights_only=True)
-            # CIFAR ResNet-18 has a 3x3/stride-1 stem and no max-pool, unlike
-            # torchvision's ImageNet ResNet-18 (7x7/stride-2 stem + max-pool).
-            model = resnet18(weights=None, num_classes=10)
-            model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-            model.maxpool = nn.Identity()
-            model.load_state_dict(state_dict, strict=True)
-            return model.to(device), {"state_dict": state_dict, "source": repo_id}
-        if num_classes not in (None, 1000):
-            raise ValueError("ResNet-18 supports num_classes=10 only with an hf_hub: CIFAR-10 checkpoint.")
+        if str(weights_path).replace("hf-hub:", "hf_hub:", 1).startswith("hf_hub:"):
+            return cls._load_timm_hub_model(weights_path, device, num_classes)
+
+        # Framework checkpoints serialize the already-constructed module.  They
+        # may therefore be CIFAR-10 variants (or structurally pruned models),
+        # and must be restored before applying torchvision's ImageNet-only
+        # class-count restriction.
         if weights_path and os.path.isfile(weights_path):
             try:
                 payload = torch.load(weights_path, map_location=device, weights_only=True)
@@ -46,10 +35,83 @@ class ResNet18Adapter(BaseModelAdapter):
             if not isinstance(model, nn.Module):
                 raise TypeError("ResNet-18 framework checkpoints must contain a serialized model module.")
             return model.to(device), payload if isinstance(payload, dict) else None
+
+        from torchvision.models import ResNet18_Weights, resnet18
+        if num_classes not in (None, 1000):
+            raise ValueError("ImageNet-pretrained torchvision ResNet-18 requires num_classes=1000.")
         weights = ResNet18_Weights.DEFAULT if str(weights_path).lower() in {"default", "imagenet1k", "imagenet-1k"} else None
         if weights is None:
-            raise ValueError("ResNet18Adapter currently supports weights='DEFAULT' only.")
+            raise ValueError(
+                f"Unsupported ResNet-18 weights value: {weights_path!r}. "
+                "Use weights: DEFAULT (or imagenet1k), or provide a valid local framework checkpoint path."
+            )
         return resnet18(weights=weights).to(device), None
+
+    @staticmethod
+    def _load_timm_hub_model(
+        model_id: str, device: torch.device, num_classes: Optional[int]
+    ) -> Tuple[nn.Module, Optional[Any]]:
+        """Load a timm-compatible Hugging Face model such as ResNet-18 CIFAR-10."""
+        try:
+            import timm
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading weights beginning with 'hf_hub:' requires timm. "
+                "Install it with: pip install timm huggingface_hub"
+            ) from exc
+
+        normalized_id = model_id.replace("hf-hub:", "hf_hub:", 1)
+        repo_id = normalized_id.split(":", 1)[1]
+        if repo_id == "edadaltocg/resnet18_cifar10":
+            return ResNet18Adapter._load_edadaltocg_cifar10(timm, repo_id, device, num_classes)
+
+        model = timm.create_model(normalized_id, pretrained=True)
+        checkpoint_classes = getattr(model, "num_classes", None)
+        if num_classes is not None and checkpoint_classes is not None and num_classes != checkpoint_classes:
+            raise ValueError(
+                f"Hugging Face model '{model_id}' has {checkpoint_classes} classes but "
+                f"model.num_classes={num_classes}."
+            )
+        return model.to(device), {"source": model_id, "loader": "timm"}
+
+    @staticmethod
+    def _load_edadaltocg_cifar10(
+        timm: Any, repo_id: str, device: torch.device, num_classes: Optional[int]
+    ) -> Tuple[nn.Module, Optional[Any]]:
+        """Load a CIFAR ResNet whose Hub config lacks its custom 3x3 stem args."""
+        checkpoint_classes = 10
+        if num_classes not in (None, checkpoint_classes):
+            raise ValueError(
+                f"Hugging Face model '{repo_id}' has {checkpoint_classes} classes but "
+                f"model.num_classes={num_classes}."
+            )
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading weights beginning with 'hf_hub:' requires huggingface_hub. "
+                "Install it with: pip install huggingface_hub"
+            ) from exc
+
+        # The checkpoint is a CIFAR adaptation of timm's ResNet-18, whereas
+        # timm's default ResNet-18 has an ImageNet 7x7, stride-2 stem.
+        model = timm.create_model("resnet18", pretrained=False, num_classes=checkpoint_classes)
+        model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        model.maxpool = nn.Identity()
+        checkpoint_path = hf_hub_download(repo_id=repo_id, filename="pytorch_model.bin")
+        try:
+            state = torch.load(checkpoint_path, map_location=device, weights_only=True)
+        except (TypeError, RuntimeError, pickle.UnpicklingError):
+            state = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        if not isinstance(state, dict):
+            raise TypeError(f"Hugging Face checkpoint '{repo_id}' must contain a state dict.")
+        model.load_state_dict(state, strict=True)
+        model.pretrained_cfg = {
+            "input_size": (3, 32, 32),
+            "mean": (0.4914, 0.4822, 0.4465),
+            "std": (0.2023, 0.1994, 0.2010),
+        }
+        return model.to(device), {"source": f"hf_hub:{repo_id}", "loader": "timm-cifar"}
 
     def supported_target_types(self) -> Set[TargetType]:
         return {TargetType.CONV_WEIGHT, TargetType.CONV_OUT_CHANNEL, TargetType.LINEAR_WEIGHT, TargetType.LINEAR_OUT_FEATURE}
@@ -112,5 +174,8 @@ class ResNet18Adapter(BaseModelAdapter):
 
     def get_dummy_input(self, device: torch.device) -> torch.Tensor:
         parameter = next(self.model.parameters())
-        spatial_size = 32 if getattr(self.model.conv1, "kernel_size", None) == (3, 3) else 224
-        return torch.randn(1, 3, spatial_size, spatial_size, device=device, dtype=parameter.dtype)
+        config = getattr(self.model, "pretrained_cfg", getattr(self.model, "default_cfg", {})) or {}
+        input_size = tuple(config.get("input_size", (3, 224, 224)))
+        if len(input_size) != 3 or any(not isinstance(value, int) or value < 1 for value in input_size):
+            input_size = (3, 224, 224)
+        return torch.randn(1, *input_size, device=device, dtype=parameter.dtype)

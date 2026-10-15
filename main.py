@@ -29,7 +29,12 @@ def parse_args():
     parser.add_argument("--strategy", type=str, default=None, help="Pruning strategy plugin")
     parser.add_argument("--criterion", type=str, default=None, help="Importance evaluation metric plugin")
     parser.add_argument("--granularity", type=str, default=None, help="Granularity plugin")
-    parser.add_argument("--weights", type=str, default=None, help="Path to model weights checkpoint")
+    parser.add_argument(
+        "--weights",
+        type=str,
+        default=None,
+        help="Path to model weights checkpoint; use DEFAULT for torchvision ResNet-18 ImageNet weights",
+    )
     parser.add_argument("--amount", type=float, default=None, help="Global pruning rate amount")
     parser.add_argument("--output-path", type=str, default=None, help="Output checkpoint destination path")
 
@@ -65,6 +70,15 @@ def main():
     # Apply Command Line Overrides
     if args.model:
         config.model.name = args.model
+        # The framework default is YOLOv5 weights.  Selecting ResNet-18 from
+        # the CLI without an explicit checkpoint must not pass that unrelated
+        # default through to the ResNet adapter.
+        if (
+            args.model.lower() in {"resnet18", "torchvision_resnet18"}
+            and args.weights is None
+            and config.model.weights == "yolov5s.pt"
+        ):
+            config.model.weights = "DEFAULT"
     if args.weights:
         config.model.weights = args.weights
     if args.strategy:

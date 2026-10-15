@@ -224,6 +224,7 @@ class FrameworkConfig:
         if self.dataset.val_limit is not None and self.dataset.val_limit < 1:
             raise ConfigValidationException("dataset.val_limit must be positive when specified.")
         classification_classes = {
+            "cifar10": 10,
             "mnist": 10,
             "fashionmnist": 10,
             "fashion_mnist": 10,
@@ -320,9 +321,16 @@ class FrameworkConfig:
         if "enabled" not in sensitivity:
             sensitivity["enabled"] = bool(analysis.get("sensitivity", False))
 
+        model = dict(sections.get("model", {}))
+        # ModelConfig defaults to YOLOv5 for backwards compatibility.  A YAML
+        # file that selects ResNet-18 but omits ``weights`` should instead use
+        # torchvision's ImageNet-pretrained default.
+        if model.get("name", "").lower() in {"resnet18", "torchvision_resnet18"} and "weights" not in model:
+            model["weights"] = "DEFAULT"
+
         config = cls(
             targets=DeploymentTargets(**dict(sections.get("targets", {}))),
-            model=ModelConfig(**dict(sections.get("model", {}))),
+            model=ModelConfig(**model),
             dataset=DatasetConfig(**dict(sections.get("dataset", {}))),
             pruning=PruningConfig(**pruning),
             analysis=AnalysisConfig(**analysis),
