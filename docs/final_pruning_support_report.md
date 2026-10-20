@@ -1,11 +1,11 @@
-# Báo cáo hỗ trợ 14 nhóm kỹ thuật pruning (15 recipe)
+# Báo cáo hỗ trợ 14 nhóm kỹ thuật pruning (20 recipe)
 
 **Ngày:** 08/10/2026  
 **Phạm vi:** framework pruning hiện tại, không dùng các benchmark legacy làm bằng chứng cho pipeline mới.
 
 ## 1. Kết luận tóm tắt
 
-Framework đã có implementation cho **14 nhóm kỹ thuật pruning** qua **15 recipe canonical** (L1 và L0 tách riêng) và một pipeline thống nhất từ model/dataset đến artifact đã prune:
+Framework đã có implementation cho **14 nhóm kỹ thuật pruning** qua **20 recipe canonical** (L1 và L0 tách riêng) và một pipeline thống nhất từ model/dataset đến artifact đã prune:
 
 ```text
 model + dataset
@@ -46,7 +46,7 @@ model + dataset
 
 ## 3. Bằng chứng full pipeline đã chạy
 
-Mười lăm config canonical trong `configs/final/` đều khai báo flow hoàn chỉnh, bao phủ 14 nhóm kỹ thuật; L1 và L0 dùng recipe riêng vì cơ chế regularization và selection khác nhau. Phân bổ hiện tại gồm 5 recipe unstructured trên LeNet, 9 recipe trên ResNet-18 CIFAR-10 và 1 recipe attention-head trên YOLOv5 C3TR. Mọi recipe dùng ba mức sensitivity `5%`, `10%`, `20%`. SNIP, GraSP và SynFlow không chạy recovery; các recipe còn lại recovery `5` epoch:
+Hai mươi config canonical trong `configs/final/` đều khai báo flow hoàn chỉnh, bao phủ 14 nhóm kỹ thuật; L1 và L0 dùng recipe riêng vì cơ chế regularization và selection khác nhau. Phân bổ hiện tại gồm 5 recipe unstructured trên LeNet, 14 recipe trên ResNet-18 CIFAR-10 và 1 recipe attention-head trên YOLOv5 C3TR. Mọi recipe dùng ba mức sensitivity `5%`, `10%`, `20%`. SNIP, GraSP và SynFlow không chạy recovery; các recipe còn lại recovery `5` epoch:
 
 ```text
 sensitivity analysis → selection → apply pruning → optional fine-tune/recovery
